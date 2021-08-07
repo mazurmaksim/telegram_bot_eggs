@@ -7,7 +7,7 @@ public enum BotState {
     Start {
         @Override
         public void enter(BotContext context) {
-            sendMessage(context, "Hello!");
+            sendMessage(context, "Hello! its a private Maks Mazur chat Bot");
         }
 
         @Override
@@ -17,6 +17,8 @@ public enum BotState {
     },
 
     EnterPhone {
+        private BotState next;
+
         @Override
         public void enter(BotContext context) {
             sendMessage(context, "Enter your phone number please:");
@@ -24,12 +26,20 @@ public enum BotState {
 
         @Override
         public void handleInput(BotContext context) {
-            context.getUser().setPhone(context.getInput());
+            String phoneNumber = context.getInput();
+
+            if(Utils.isValidPhoneNumber(phoneNumber)) {
+                context.getUser().setPhone(phoneNumber);
+                next = EnterEmail;
+            } else {
+                sendMessage(context, "Wrong phone number!");
+                next = EnterPhone;
+            }
         }
 
         @Override
         public BotState nextState() {
-            return EnterEmail;
+            return next;
         }
     },
 

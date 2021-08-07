@@ -143,7 +143,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         users.forEach(user ->
                 sb.append(user.getId())
-                        .append(' ')
+                        .append(") ")
                         .append(user.getPhone())
                         .append(' ')
                         .append(user.getEmail())

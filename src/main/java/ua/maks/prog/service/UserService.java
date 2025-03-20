@@ -1,7 +1,7 @@
 package ua.maks.prog.service;
 
 import org.springframework.stereotype.Service;
-import ua.maks.prog.repo.UserRepository;
+import ua.maks.prog.repository.UserRepository;
 import ua.maks.prog.user.User;
 
 import org.springframework.transaction.annotation.Transactional;

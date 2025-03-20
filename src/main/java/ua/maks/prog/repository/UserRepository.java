@@ -1,4 +1,4 @@
-package ua.maks.prog.repo;
+package ua.maks.prog.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

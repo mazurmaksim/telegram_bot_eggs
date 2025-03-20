@@ -1,70 +1,75 @@
 package ua.maks.prog.service;
 
+import org.springframework.stereotype.Component;
 import ua.maks.prog.entity.Counter;
+import ua.maks.prog.entity.FeedComposition;
+import ua.maks.prog.entity.WeatherForecast;
+import ua.maks.prog.weather.service.WeatherService;
+import ua.maks.prog.weather.service.forecast.WeatherParser;
+import ua.maks.prog.weather.service.forecast.WeatherResponse;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 
+@Component
 public class EggsService {
-    private void onManualSaveButtonClick() {
+    private final FeedCompositionService feedCompositionService;
+    private final CounterService counterService;
+    private final WeatherService weatherService;
+
+    public EggsService(FeedCompositionService feedCompositionService, CounterService counterService, WeatherService weatherService) {
+        this.feedCompositionService = feedCompositionService;
+        this.counterService = counterService;
+        this.weatherService = weatherService;
+    }
+
+    private void addEgg(String amountInput) {
         try {
-            List<Counter> allData = new ArrayList<>(tableView.getItems());
 
 //            TODO: amount from telegram
-            int amount = Integer.parseInt("10");
-            LocalDate date = datePicker.getValue();
-            String foodCompositionName = foodPlanChoice.getValue();
+            int amount = Integer.parseInt(amountInput);
+            LocalDate date = LocalDate.now();
+
             Counter entry = new Counter();
+            Optional<Counter> counter = counterService.getCounterByDate(date);
 
-            WeatherResponse weatherResponse = getWeatherForecast();
-            WeatherForecast weatherForecast = new WeatherForecast();
+            if(counter.isPresent()) {
+                WeatherResponse weatherResponse = getWeatherForecast();
+                WeatherForecast weatherForecast = new WeatherForecast();
 
-            if(weatherResponse !=null) {
-                weatherForecast.setHumidity(weatherResponse.getMain().getHumidity());
-                weatherForecast.setTemperature(weatherResponse.getMain().getTemp());
-                weatherForecast.setWindSpeed(weatherResponse.getWind().getSpeed());
-                weatherForecast.setRetrievedSuccessfully(true);
-            }
-
-            if (date == null) {
-                showError("Please select a date.");
-                return;
-            }
-            FeedComposition feedComposition = StatisticDao.getFeedCompositionByName(foodCompositionName);
-            for (Counter counter : allData) {
-                if(counter.getWeatherForecast() == null) {
-                    entry.setWeatherForecast(weatherForecast);
+                if (weatherResponse != null) {
+                    weatherForecast.setHumidity(weatherResponse.getMain().getHumidity());
+                    weatherForecast.setTemperature(weatherResponse.getMain().getTemp());
+                    weatherForecast.setWindSpeed(weatherResponse.getWind().getSpeed());
+                    weatherForecast.setRetrievedSuccessfully(true);
                 }
-                if (date.equals(counter.getDateTime())) {
-                    showError("You trying  insert already existing record for date: " + date
-                            + System.lineSeparator() +
-                            "If You want update use update button");
-                    return;
-                }
+
+                String foodCompositionName = feedCompositionService.findActiveCompositionName();
+                FeedComposition feedComposition = feedCompositionService.findFeedCompositionByName(foodCompositionName);
+
+                entry.setAmount(amount);
+                entry.setDateTime(date);
+                entry.setWeatherForecast(weatherForecast);
+                entry.setFeedComposition(feedComposition);
+                weatherForecast.setDayStatistic(entry);
+                counterService.saveCounter(entry);
+            } else {
+//                TODO: Send message to telegram "Entry for this date already exists pleas use command Update"
             }
-
-            if (date.isAfter(LocalDate.now())) {
-                showError("Impossible to add value to a past day: " + date);
-                return;
-            }
-
-            entry.setAmount(amount);
-            entry.setDateTime(date);
-            entry.setFeedComposition(feedComposition);
-            Persistence<Counter> saver = new Persistence<>();
-            weatherForecast.setDayStatistic(entry);
-
-            saver.persist(entry);
-
-            addManually.clear();
-            datePicker.setValue(null);
-            initialize();
         } catch (NumberFormatException e) {
-            showError("Please enter a valid number of eggs.");
+
         } catch (Exception ex) {
-            showError(ex.getMessage());
+
         }
     }
 
+    private WeatherResponse getWeatherForecast() {
+        try {
+            WeatherParser parser = new WeatherParser();
+            return parser.parseWeatherJson(weatherService.getWeather());
+        } catch (Exception ex) {
+
+        }
+        return null;
+    }
 }

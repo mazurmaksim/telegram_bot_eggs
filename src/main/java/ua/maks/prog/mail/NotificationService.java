@@ -2,9 +2,10 @@ package ua.maks.prog.mail;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.mail.javamail.JavaMailSender;
+
 import org.springframework.stereotype.Component;
 import ua.maks.prog.service.UserService;
 import ua.maks.prog.user.User;

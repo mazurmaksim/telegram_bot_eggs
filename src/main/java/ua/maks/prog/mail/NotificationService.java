@@ -34,7 +34,7 @@ public class NotificationService {
     @Scheduled(fixedRate = 1000)
     public void sendNewApplications() {
         List<User> users = userService.findNewUsers();
-        if (users.size() == 0)
+        if (users.isEmpty())
             return;
         StringBuilder sb = new StringBuilder();
 

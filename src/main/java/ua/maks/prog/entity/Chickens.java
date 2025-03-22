@@ -12,7 +12,7 @@ import org.hibernate.annotations.GenericGenerator;
 import java.util.UUID;
 
 @Entity
-@Table(name = "chickens")
+@Table(name = "chickens_amount")
 public class Chickens {
     @Id
     @GeneratedValue(generator = "UUID")

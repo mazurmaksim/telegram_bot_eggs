@@ -23,45 +23,44 @@ public class EggsService {
         this.weatherService = weatherService;
     }
 
-    private void addEgg(String amountInput) {
-        try {
-
+    public void addEgg(String amountInput) throws NumberFormatException{
 //            TODO: amount from telegram
-            int amount = Integer.parseInt(amountInput);
-            LocalDate date = LocalDate.now();
+        int amount = Integer.parseInt(amountInput);
+        LocalDate date = LocalDate.now();
 
-            Counter entry = new Counter();
-            Optional<Counter> counter = counterService.getCounterByDate(date);
+        Counter entry = new Counter();
+        Optional<Counter> counter = counterService.getCounterByDate(date);
 
-            if(counter.isPresent()) {
-                WeatherResponse weatherResponse = getWeatherForecast();
-                WeatherForecast weatherForecast = new WeatherForecast();
+        if (counter.isEmpty()) {
+            WeatherResponse weatherResponse = getWeatherForecast();
+            WeatherForecast weatherForecast = new WeatherForecast();
 
-                if (weatherResponse != null) {
-                    weatherForecast.setHumidity(weatherResponse.getMain().getHumidity());
-                    weatherForecast.setTemperature(weatherResponse.getMain().getTemp());
-                    weatherForecast.setWindSpeed(weatherResponse.getWind().getSpeed());
-                    weatherForecast.setRetrievedSuccessfully(true);
-                }
-
-                String foodCompositionName = feedCompositionService.findActiveCompositionName();
-                FeedComposition feedComposition = feedCompositionService.findFeedCompositionByName(foodCompositionName);
-
-                entry.setAmount(amount);
-                entry.setDateTime(date);
-                entry.setWeatherForecast(weatherForecast);
-                entry.setFeedComposition(feedComposition);
-                weatherForecast.setDayStatistic(entry);
-                counterService.saveCounter(entry);
-            } else {
-//                TODO: Send message to telegram "Entry for this date already exists pleas use command Update"
+            if (weatherResponse != null) {
+                weatherForecast.setHumidity(weatherResponse.getMain().getHumidity());
+                weatherForecast.setTemperature(weatherResponse.getMain().getTemp());
+                weatherForecast.setWindSpeed(weatherResponse.getWind().getSpeed());
+                weatherForecast.setRetrievedSuccessfully(true);
             }
-        } catch (NumberFormatException e) {
 
-        } catch (Exception ex) {
+            String foodCompositionName = feedCompositionService.findActiveCompositionName();
+            FeedComposition feedComposition = feedCompositionService.findFeedCompositionByName(foodCompositionName);
 
+            entry.setAmount(amount);
+            entry.setDateTime(date);
+            entry.setWeatherForecast(weatherForecast);
+            entry.setFeedComposition(feedComposition);
+            weatherForecast.setDayStatistic(entry);
+            counterService.saveCounter(entry);
+        } else {
+            Integer updatedAmount = counter.get().getAmount() + amount;
+            counter.get().setAmount(updatedAmount);
+            counterService.saveCounter(counter.get());
+//                TODO: Send message to telegram "Entry for this date already exists pleas use command Update"
+            System.out.println("You can not add eggs you can update");
         }
     }
+
+
 
     private WeatherResponse getWeatherForecast() {
         try {

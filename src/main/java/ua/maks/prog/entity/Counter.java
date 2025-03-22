@@ -22,7 +22,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "day_statistic")
 @Access(AccessType.PROPERTY)
-public class Counter implements Comparable<Counter> {
+public class
+Counter implements Comparable<Counter> {
 
     private UUID id;
     private LocalDate dateTime;

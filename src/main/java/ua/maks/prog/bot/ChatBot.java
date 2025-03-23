@@ -1,8 +1,16 @@
 package ua.maks.prog.bot;
 
+import org.knowm.xchart.AnnotationText;
+import org.knowm.xchart.BitmapEncoder;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
+import org.knowm.xchart.XYSeries;
+import org.knowm.xchart.style.Styler;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -12,6 +20,10 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.maks.prog.config.BotConfig;
 import ua.maks.prog.service.EggsService;
 
+
+import java.io.File;
+import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +57,13 @@ public class ChatBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 String messageText = update.getMessage().getText();
 
+                switch (messageText) {
+                    case "Сьогодні" :
+                        sendMessage(chatId, "Показую статистику за сьогодні");
+                        sendTodayStats(chatId);
+                        break;
+                }
+
                 if (messageText.equals("/start")) {
                     sendMainMenu(update.getMessage());
                 } else {
@@ -66,6 +85,61 @@ public class ChatBot extends TelegramLongPollingBot {
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
+        }
+    }
+
+    private void sendTodayStats(Long chatId) {
+        LocalDate today = LocalDate.now();
+        List<Integer> xData = new ArrayList<>();
+        List<Integer> yData = new ArrayList<>();
+
+        for (int i = 1; i <= today.getDayOfMonth(); i++) {
+            xData.add(i);
+            yData.add((int) (Math.random() * 10));
+        }
+
+        XYChart chart = new XYChartBuilder()
+                .width(800)
+                .height(600)
+                .title("Статистика за " + today.getMonth().name())
+                .xAxisTitle("День місяця")
+                .yAxisTitle("Кількість яєць")
+                .build();
+
+        chart.getStyler().setLegendPosition(Styler.LegendPosition.InsideNW);
+        chart.getStyler().setMarkerSize(6);
+        chart.getStyler().setDefaultSeriesRenderStyle(XYSeries.XYSeriesRenderStyle.Line);
+        chart.getStyler().setXAxisLabelRotation(45);
+
+        chart.addSeries("Яйця", xData, yData);
+
+        AnnotationText textAnnotation = new AnnotationText(
+                today.getMonth().name(),
+                today.getDayOfMonth() / 2.0,
+                yData.stream().mapToInt(Integer::intValue).max().orElse(10) + 2,
+                true
+        );
+        chart.addAnnotation(textAnnotation);
+
+        File chartFile = new File("chart.png");
+        try {
+            BitmapEncoder.saveBitmap(chart, chartFile.getAbsolutePath(), BitmapEncoder.BitmapFormat.PNG);
+        } catch (IOException e) {
+            e.printStackTrace();
+            sendMessage(chatId, "Сталася помилка при створенні графіка.");
+            return;
+        }
+
+
+        SendPhoto sendPhoto = new SendPhoto();
+        sendPhoto.setChatId(chatId.toString());
+        sendPhoto.setPhoto(new InputFile(chartFile));
+
+        try {
+            execute(sendPhoto);
+        } catch (Exception e) {
+            e.printStackTrace();
+            sendMessage(chatId, "Сталася помилка при відправці графіка.");
         }
     }
 

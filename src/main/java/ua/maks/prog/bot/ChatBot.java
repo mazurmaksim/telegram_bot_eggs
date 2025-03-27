@@ -18,25 +18,30 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.maks.prog.config.BotConfig;
+import ua.maks.prog.entity.Counter;
+import ua.maks.prog.service.CounterService;
 import ua.maks.prog.service.EggsService;
 
 
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Month;
+import java.time.YearMonth;
+import java.util.*;
 
 @Component
 public class ChatBot extends TelegramLongPollingBot {
 
     private final BotConfig botConfig;
     private final EggsService eggsService;
+    private final CounterService counterService;
 
-    public ChatBot(BotConfig botConfig, EggsService eggsService) {
+    public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService) {
         super();
         this.botConfig = botConfig;
         this.eggsService = eggsService;
+        this.counterService = counterService;
     }
 
     @Override
@@ -51,31 +56,79 @@ public class ChatBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        Long chatId = update.getMessage().getChatId();
-
         try {
             if (update.hasMessage() && update.getMessage().hasText()) {
+                Long chatId = update.getMessage().getChatId();
                 String messageText = update.getMessage().getText();
+                Map<String, Runnable> commands = getStringRunnableMap(chatId);
 
-                switch (messageText) {
-                    case "Сьогодні" :
-                        sendMessage(chatId, "Показую статистику за сьогодні");
-                        sendTodayStats(chatId);
-                        break;
-                }
-
-                if (messageText.equals("/start")) {
+                if ("/start".equals(messageText)) {
                     sendMainMenu(update.getMessage());
+                } else if (commands.containsKey(messageText)) {
+                    commands.get(messageText).run();
                 } else {
-                    eggsService.addEgg(messageText);
-                    System.out.println("New message from " + chatId + ": " + messageText);
-                    sendMessage(chatId, "Кількість яєць збережена: " + messageText);
+                    saveEggCount(chatId, messageText);
                 }
             }
         } catch (Exception e) {
-            sendMessage(chatId, "Дані не збереглись, повинно бути число " + e.getMessage());
+            sendMessage(update.getMessage().getChatId(), "Дані не збереглись, повинно бути число " + e.getMessage());
         }
     }
+
+    private Map<String, Runnable> getStringRunnableMap(Long chatId) {
+        List<Counter> allStatistic = counterService.getAllStatistic();
+
+        Map<String, Runnable> commands = Map.of(
+                "Сьогодні", () -> sendDayAmount(chatId, LocalDate.now(), formatDayStatistic("сьогодні")),
+                "Вчора", () -> sendDayAmount(chatId, LocalDate.now().minusDays(1), formatDayStatistic("вчора")),
+                "Місяці", () -> sendMessage(chatId, formatMonthStatistic(counterService.calculateAmountByMonth(allStatistic))),
+                "Тижні(Поточний місяць)", () -> sendMessage(chatId, formatWeekStatistic(counterService.calculateAmountByWeek(allStatistic)))
+        );
+        return commands;
+    }
+
+    private String formatDayStatistic(String dayLabel) {
+        return String.format("📊 Показую статистику за %s\n📅 %s яєць: ", dayLabel, dayLabel.substring(0, 1).toUpperCase() + dayLabel.substring(1));
+    }
+
+    private String formatMonthStatistic(Map<Month, Integer> monthStatistic) {
+        StringBuilder monthBuilder = new StringBuilder("📊 Статистика по місяцям:\n\n");
+        monthStatistic.forEach((month, amount) -> {
+            if (amount != 0) {
+                monthBuilder.append("📅 ").append(month.name()).append(": ").append(amount).append(" 🥚\n");
+            }
+        });
+        return monthBuilder.toString();
+    }
+
+    private String formatWeekStatistic(Map<Integer, Integer> monthsStatistic) {
+        StringBuilder weekStatBuilder = new StringBuilder("📊 Показую статистику за тижні:\n\n");
+        Map<Integer, Integer> weeksStatistic = new TreeMap<>();
+
+        YearMonth currentMonth = YearMonth.now();
+        int daysInMonth = currentMonth.lengthOfMonth();
+        int firstDayOfWeek = currentMonth.atDay(1).getDayOfWeek().getValue();
+
+        for (int day = 1; day <= daysInMonth; day++) {
+            int weekNumber = (day + firstDayOfWeek - 2) / 7;
+            weeksStatistic.merge(weekNumber, monthsStatistic.getOrDefault(day, 0), Integer::sum);
+        }
+
+        weeksStatistic.forEach((week, amount) -> {
+            if (week != 0 && amount != 0) {
+                weekStatBuilder.append("🗓 Week ").append(week).append(": ").append(amount).append(" 🥚\n");
+            }
+        });
+
+        return weekStatBuilder.toString();
+    }
+
+    private void saveEggCount(Long chatId, String messageText) {
+        eggsService.addEgg(messageText);
+        System.out.println("New message from " + chatId + ": " + messageText);
+        sendMessage(chatId, "Кількість яєць збережена: " + messageText);
+    }
+
 
     private void sendMessage(Long chatId, String text) {
         SendMessage message = new SendMessage();
@@ -143,12 +196,20 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
+    public void sendDayAmount(Long chatId, LocalDate date, String message) {
+        Optional<Counter> counter = counterService.getCounterByDate(date);
+        counter.ifPresentOrElse(
+                c -> sendMessage(chatId, message + c.getAmount()),
+                () -> sendMessage(chatId, "На сьогодні немає збереженої статистики")
+        );
+    }
+
     private void sendMainMenu(Message message) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
         KeyboardRow row1 = new KeyboardRow();
         row1.add(new KeyboardButton("Сьогодні"));
-        row1.add(new KeyboardButton("Дні(поточний місяць)"));
+        row1.add(new KeyboardButton("Вчора"));
 
         KeyboardRow row2 = new KeyboardRow();
         row2.add(new KeyboardButton("Тижні(Поточний місяць)"));

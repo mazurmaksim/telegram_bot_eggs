@@ -21,6 +21,7 @@ import ua.maks.prog.config.BotConfig;
 import ua.maks.prog.entity.Counter;
 import ua.maks.prog.service.CounterService;
 import ua.maks.prog.service.EggsService;
+import ua.maks.prog.views.MonthView;
 
 
 import java.io.File;
@@ -95,7 +96,11 @@ public class ChatBot extends TelegramLongPollingBot {
         StringBuilder monthBuilder = new StringBuilder("📊 Статистика по місяцям:\n\n");
         monthStatistic.forEach((month, amount) -> {
             if (amount != 0) {
-                monthBuilder.append("📅 ").append(month.name()).append(": ").append(amount).append(" 🥚\n");
+                monthBuilder.append("📅 ")
+                        .append(MonthView.valueOf(month.name()).getMonthName())
+                        .append(": ")
+                        .append(amount)
+                        .append(" 🥚\n");
             }
         });
         return monthBuilder.toString();
@@ -116,7 +121,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         weeksStatistic.forEach((week, amount) -> {
             if (week != 0 && amount != 0) {
-                weekStatBuilder.append("🗓 Week ").append(week).append(": ").append(amount).append(" 🥚\n");
+                weekStatBuilder.append("🗓 Тижні ").append(week).append(": ").append(amount).append(" 🥚\n");
             }
         });
 
@@ -126,7 +131,7 @@ public class ChatBot extends TelegramLongPollingBot {
     private void saveEggCount(Long chatId, String messageText) {
         eggsService.addEgg(messageText);
         System.out.println("New message from " + chatId + ": " + messageText);
-        sendMessage(chatId, "Кількість яєць збережена: " + messageText);
+        sendMessage(chatId, "\uD83D\uDCBE Кількість яєць збережена: " + messageText);
     }
 
 
@@ -199,7 +204,10 @@ public class ChatBot extends TelegramLongPollingBot {
     public void sendDayAmount(Long chatId, LocalDate date, String message) {
         Optional<Counter> counter = counterService.getCounterByDate(date);
         counter.ifPresentOrElse(
-                c -> sendMessage(chatId, message + c.getAmount()),
+                c -> sendMessage(chatId, message + c.getAmount() +
+                        System.lineSeparator() +
+                        "\uD83C\uDF21\uFE0F  Температура повітря: " +
+                        c.getWeatherForecast().getTemperature()),
                 () -> sendMessage(chatId, "На сьогодні немає збереженої статистики")
         );
     }

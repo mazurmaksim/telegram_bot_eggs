@@ -9,6 +9,5 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class TelBotApplication {
     public static void main(String[] args) {
         SpringApplication.run(TelBotApplication.class, args);
-
     }
 }

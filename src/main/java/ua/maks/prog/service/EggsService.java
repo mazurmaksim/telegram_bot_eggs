@@ -9,6 +9,8 @@ import ua.maks.prog.weather.service.forecast.WeatherParser;
 import ua.maks.prog.weather.service.forecast.WeatherResponse;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 @Component
@@ -23,10 +25,10 @@ public class EggsService {
         this.weatherService = weatherService;
     }
 
-    public void addEgg(String amountInput) throws NumberFormatException{
+    public void addEgg(String amountInput, LocalDateTime savingTime) throws NumberFormatException{
 //            TODO: amount from telegram
         int amount = Integer.parseInt(amountInput);
-        LocalDate date = LocalDate.now();
+        LocalDate date = savingTime.toLocalDate();
 
         Counter entry = new Counter();
         Optional<Counter> counter = counterService.getCounterByDate(date);

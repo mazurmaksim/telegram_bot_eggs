@@ -26,9 +26,8 @@ import ua.maks.prog.views.MonthView;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.Month;
-import java.time.YearMonth;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Component
@@ -61,6 +60,12 @@ public class ChatBot extends TelegramLongPollingBot {
             if (update.hasMessage() && update.getMessage().hasText()) {
                 Long chatId = update.getMessage().getChatId();
                 String messageText = update.getMessage().getText();
+                Integer savingDateInSec = update.getMessage().getDate();
+                LocalDateTime savingLocalDate =
+                        Instant
+                                .ofEpochSecond(savingDateInSec)
+                                .atZone(ZoneId.of("Europe/Kyiv"))
+                                .toLocalDateTime();
                 Map<String, Runnable> commands = getStringRunnableMap(chatId);
 
                 if ("/start".equals(messageText)) {
@@ -68,7 +73,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 } else if (commands.containsKey(messageText)) {
                     commands.get(messageText).run();
                 } else {
-                    saveEggCount(chatId, messageText);
+                    saveEggCount(chatId, messageText, savingLocalDate);
                 }
             }
         } catch (Exception e) {
@@ -128,8 +133,8 @@ public class ChatBot extends TelegramLongPollingBot {
         return weekStatBuilder.toString();
     }
 
-    private void saveEggCount(Long chatId, String messageText) {
-        eggsService.addEgg(messageText);
+    private void saveEggCount(Long chatId, String messageText, LocalDateTime savingTime) {
+        eggsService.addEgg(messageText, savingTime);
         System.out.println("New message from " + chatId + ": " + messageText);
         sendMessage(chatId, "\uD83D\uDCBE Кількість яєць збережена: " + messageText);
     }

@@ -7,7 +7,7 @@ import ua.maks.prog.repository.FoodCompositionRepository;
 
 @Service
 public class FeedCompositionService {
-    private FoodCompositionRepository foodCompositionRepository;
+    private final FoodCompositionRepository foodCompositionRepository;
 
     public FeedCompositionService(FoodCompositionRepository foodCompositionRepository) {
         this.foodCompositionRepository = foodCompositionRepository;

@@ -1,5 +1,7 @@
 package ua.maks.prog.bot;
 
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.Phonenumber;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -12,12 +14,11 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.maks.prog.config.BotConfig;
 import ua.maks.prog.entity.BotAdmin;
 import ua.maks.prog.entity.Counter;
+import ua.maks.prog.entity.Order;
 import ua.maks.prog.entity.Sales;
-import ua.maks.prog.service.BotAdminService;
-import ua.maks.prog.service.CounterService;
-import ua.maks.prog.service.EggsService;
-import ua.maks.prog.service.SalesService;
+import ua.maks.prog.service.*;
 import ua.maks.prog.views.MonthView;
+import ua.maks.prog.views.OrderStatus;
 
 import java.time.*;
 import java.util.*;
@@ -30,14 +31,18 @@ public class ChatBot extends TelegramLongPollingBot {
     private final CounterService counterService;
     private final SalesService salesService;
     private final BotAdminService botAdminService;
+    private final OrderService orderService;
     private final Map<Long, Integer> pendingOrders = new HashMap<>();
 
-    public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService, SalesService salesService, BotAdminService botAdminService) {
+    public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService,
+                   SalesService salesService, BotAdminService botAdminService, OrderService orderService
+    ) {
         this.botConfig = botConfig;
         this.eggsService = eggsService;
         this.counterService = counterService;
         this.salesService = salesService;
         this.botAdminService = botAdminService;
+        this.orderService = orderService;
     }
 
     @Override
@@ -138,8 +143,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 break;
             default:
                 if (pendingOrders.containsKey(chatId)) {
-                    String nameAndPhone = text;
-                    saveOrder(chatId, pendingOrders.get(chatId), nameAndPhone);
+                    saveOrder(chatId, pendingOrders.get(chatId), text);
                     pendingOrders.remove(chatId);
                     sendConfirmation(chatId);
                 } else {
@@ -148,9 +152,54 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void saveOrder(Long chatId, int quantity, String contactInfo) {
-        System.out.printf("Замовлення: %d яєць від %d, контакт: %s%n", quantity, chatId, contactInfo);
+    public static boolean isValidPhoneNumber(String phone) {
+        try {
+            PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
+            Phonenumber.PhoneNumber numberProto = phoneUtil.parse(phone, "UA");
+            return phoneUtil.isValidNumber(numberProto);
+        } catch (Exception e) {
+            return false;
+        }
     }
+
+    private void saveOrder(Long chatId, int quantity, String contactInfo) {
+        String name;
+        String phoneNumber;
+        String[] userInfo = contactInfo.split(",");
+
+        if (userInfo.length == 2 && isValidPhoneNumber(userInfo[1])) {
+            name = userInfo[0].trim();
+            phoneNumber = userInfo[1].trim();
+        } else {
+            sendMessage(chatId, "❌ Некоректні контактні дані. Введіть у форматі: Ім'я,Телефон");
+            return;
+        }
+
+        List<Order> ordersByPhone = orderService.getOrderByPhone(phoneNumber);
+
+        boolean updated = false;
+
+        for (Order existingOrder : ordersByPhone) {
+            if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
+                existingOrder.setAmount(existingOrder.getAmount() + quantity);
+                orderService.saveOrder(existingOrder);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            Order newOrder = new Order();
+            newOrder.setAmount(quantity);
+            newOrder.setPhoneNumber(phoneNumber);
+            newOrder.setUserName(name);
+            newOrder.setStatus(OrderStatus.NEW);
+            orderService.saveOrder(newOrder);
+        }
+
+        System.out.printf("✅ Замовлення: %d яєць від %d, контакт: %s%n", quantity, chatId, contactInfo);
+    }
+
 
     private void sendUserMainMenu(Long chatId) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
@@ -205,7 +254,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("10"), new KeyboardButton("15"), new KeyboardButton("20"))));
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("30"), new KeyboardButton("40"), new KeyboardButton("50"))));
-        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"))));
+        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"), new KeyboardButton("Повернутись назад"))));
 
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);

@@ -19,7 +19,7 @@ public enum MonthView {
     DECEMBER("Грудень");
 
     private static final Map<String, MonthView> NAME_MAP = Stream.of(values())
-            .collect(Collectors.toMap(m -> m.name(), m -> m));
+            .collect(Collectors.toMap(Enum::name, m -> m));
 
     private final String monthName;
 

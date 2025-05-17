@@ -28,7 +28,11 @@
       <artifactId>spring-boot-starter-mail</artifactId>
       <version>3.4.3</version>
     </dependency>
-
+    <dependency>
+      <groupId>com.googlecode.libphonenumber</groupId>
+      <artifactId>libphonenumber</artifactId>
+      <version>8.12.38</version>
+    </dependency>
     <dependency>
       <groupId>org.eclipse.angus</groupId>
       <artifactId>angus-mail</artifactId>

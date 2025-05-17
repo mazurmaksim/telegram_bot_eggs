@@ -18,7 +18,6 @@ public class Order {
     private UUID id;
 
     private String phoneNumber;
-    private String userName;
     private Integer amount;
     private OrderStatus status = OrderStatus.NEW;
     private Long chatId;
@@ -29,14 +28,6 @@ public class Order {
 
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
-    }
-
-    public String getUserName() {
-        return userName;
-    }
-
-    public void setUserName(String userName) {
-        this.userName = userName;
     }
 
     public Integer getAmount() {
@@ -61,5 +52,13 @@ public class Order {
 
     public void setChatId(Long chatId) {
         this.chatId = chatId;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 }

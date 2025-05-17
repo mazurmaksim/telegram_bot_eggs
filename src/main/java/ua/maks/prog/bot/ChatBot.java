@@ -14,6 +14,7 @@ import ua.maks.prog.config.BotConfig;
 import ua.maks.prog.entity.Counter;
 import ua.maks.prog.entity.Order;
 import ua.maks.prog.entity.Sales;
+import ua.maks.prog.model.UserData;
 import ua.maks.prog.service.*;
 import ua.maks.prog.views.AdminAction;
 import ua.maks.prog.views.MonthView;
@@ -31,7 +32,7 @@ public class ChatBot extends TelegramLongPollingBot {
     private final SalesService salesService;
     private final BotAdminService botAdminService;
     private final OrderService orderService;
-    private final Map<Long, Integer> pendingOrders = new HashMap<>();
+    private final Map<Long, UserData> pendingOrders = new HashMap<>();
     private final Map<Long, AdminAction> adminStates = new HashMap<>();
 
     public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService,
@@ -205,14 +206,18 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void handleUserCommand(Long chatId, String text) {
-        if ("⬅ Назад".equals(text)) {
+        List<Order> orders = orderService.getOrderByChatId(chatId);
+
+        if ("/start".equals(text) || "⬅ Назад".equals(text)) {
             sendUserMainMenu(chatId);
             return;
         }
+
         switch (text) {
             case "Зробити замовлення":
                 sendQuantitySelectionMenu(chatId);
-                break;
+                return;
+
             case "10":
             case "15":
             case "20":
@@ -220,25 +225,43 @@ public class ChatBot extends TelegramLongPollingBot {
             case "40":
             case "50":
             case "60":
-                saveOrder(chatId, Integer.parseInt(text), text);
-                sendConfirmation(chatId);
-                break;
-            case "На продаж":
-                sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now())));
-                break;
-            case "/start":
-                sendUserMainMenu(chatId);
-                return;
-            default:
-                if (pendingOrders.containsKey(chatId)) {
-                    saveOrder(chatId, pendingOrders.get(chatId), text);
-                    pendingOrders.remove(chatId);
-                    sendConfirmation(chatId);
+                int quantity = Integer.parseInt(text);
+                if (orders.isEmpty()) {
+                    askForPhone(chatId);
+                    pendingOrders.put(chatId, new UserData(quantity));
                 } else {
-                    sendUserMainMenu(chatId);
+                    saveOrder(chatId, new UserData(quantity), orders);
+                    sendConfirmation(chatId);
                 }
+                return;
+
+            case "На продаж":
+                String stat = formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now()));
+                sendMessage(chatId, stat);
+                return;
         }
+
+        if (pendingOrders.containsKey(chatId)) {
+            String phone = text.trim();
+
+            if (!isValidPhoneNumber(phone)) {
+                sendMessage(chatId, "❌ Невірний формат номера. Введіть у форматі: +380XXXXXXXXX");
+                return;
+            }
+
+            UserData userData = pendingOrders.get(chatId);
+            userData.setPhoneNumber(phone);
+
+            saveOrder(chatId, userData, orders);
+            pendingOrders.remove(chatId);
+            sendConfirmation(chatId);
+            return;
+        }
+
+        sendUserMainMenu(chatId);
     }
+
+
 
     public static boolean isValidPhoneNumber(String phone) {
         try {
@@ -250,44 +273,23 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void saveOrder(Long chatId, int quantity, String contactInfo) {
-        String name = null;
+    private void saveOrder(Long chatId, UserData userData, List<Order> orders) {
         String phoneNumber = null;
-
-        List<Order> orders = orderService.getOrderByChatId(chatId);
-
-        if (!orders.isEmpty()) {
-            Order anyOrder = orders.get(0);
-            name = anyOrder.getUserName();
-            phoneNumber = anyOrder.getPhoneNumber();
-        } else {
-            askForNameAndPhone(chatId);
-            String[] userInfo = contactInfo.split(",");
-            if (userInfo.length != 2 || !isValidPhoneNumber(userInfo[1])) {
-                sendMessage(chatId, "❌ Некоректні контактні дані. Введіть у форматі: Ім'я,Телефон");
-                return;
-            }
-            name = userInfo[0].trim();
-            phoneNumber = userInfo[1].trim();
-        }
 
         for (Order existingOrder : orders) {
             if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
-                existingOrder.setAmount(existingOrder.getAmount() + quantity);
+                existingOrder.setAmount(existingOrder.getAmount() + userData.getAmount());
                 orderService.saveOrder(existingOrder);
                 sendMessage(chatId, "✅ Ваше поточне замовлення оновлено.");
                 return;
             }
         }
-
         Order newOrder = new Order();
-        newOrder.setAmount(quantity);
-        newOrder.setPhoneNumber(phoneNumber);
-        newOrder.setUserName(name);
+        newOrder.setAmount(userData.getAmount());
+        newOrder.setPhoneNumber(userData.getPhoneNumber());
         newOrder.setChatId(chatId);
         newOrder.setStatus(OrderStatus.NEW);
         orderService.saveOrder(newOrder);
-
         sendMessage(chatId, "✅ Нове замовлення прийнято. Дякуємо!");
     }
 
@@ -319,8 +321,8 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void askForNameAndPhone(Long chatId) {
-        SendMessage msg = new SendMessage(chatId.toString(), "Введіть ваше ім'я та номер телефону у форматі:\n\n**Ім'я, телефон**");
+    private void askForPhone(Long chatId) {
+        SendMessage msg = new SendMessage(chatId.toString(), "Введіть телефону:");
         msg.setParseMode("Markdown");
 
         try {

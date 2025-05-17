@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 @Component
 public class CounterService {
@@ -51,7 +52,7 @@ public class CounterService {
             if (counter.getDateTime().getYear() == LocalDate.now().getYear())
                 amountByMonth.put(counter.getDateTime().getMonth(), amountByMonth.getOrDefault(counter.getDateTime().getMonth(), 0) + counter.getAmount());
         }
-        return amountByMonth;
+        return new TreeMap<>(amountByMonth);
     }
 
 }

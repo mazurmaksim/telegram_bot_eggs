@@ -21,6 +21,7 @@ public class Order {
     private String userName;
     private Integer amount;
     private OrderStatus status = OrderStatus.NEW;
+    private Long chatId;
 
     public String getPhoneNumber() {
         return phoneNumber;
@@ -52,5 +53,13 @@ public class Order {
 
     public void setStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public Long getChatId() {
+        return chatId;
+    }
+
+    public void setChatId(Long chatId) {
+        this.chatId = chatId;
     }
 }

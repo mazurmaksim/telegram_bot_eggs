@@ -22,9 +22,9 @@ public class OrderService {
         }
     }
 
-    public List<Order> getOrderByPhone(String phone) {
-        if (phone != null) {
-           return orderRepository.getOrderByPhoneNumber(phone);
+    public List<Order> getOrderByChatId(Long chatId) {
+        if (chatId != null) {
+           return orderRepository.getOrderByChatId(chatId);
         } else {
             return null;
         }

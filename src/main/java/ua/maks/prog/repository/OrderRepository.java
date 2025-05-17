@@ -7,5 +7,5 @@ import java.util.List;
 import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<Order, UUID> {
-    List<Order> getOrderByPhoneNumber(String phoneNumber);
+    List<Order> getOrderByChatId(Long phoneNumber);
 }

@@ -5,18 +5,17 @@ import com.google.i18n.phonenumbers.Phonenumber;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
-import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.maks.prog.config.BotConfig;
-import ua.maks.prog.entity.BotAdmin;
 import ua.maks.prog.entity.Counter;
 import ua.maks.prog.entity.Order;
 import ua.maks.prog.entity.Sales;
 import ua.maks.prog.service.*;
+import ua.maks.prog.views.AdminAction;
 import ua.maks.prog.views.MonthView;
 import ua.maks.prog.views.OrderStatus;
 
@@ -33,6 +32,7 @@ public class ChatBot extends TelegramLongPollingBot {
     private final BotAdminService botAdminService;
     private final OrderService orderService;
     private final Map<Long, Integer> pendingOrders = new HashMap<>();
+    private final Map<Long, AdminAction> adminStates = new HashMap<>();
 
     public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService,
                    SalesService salesService, BotAdminService botAdminService, OrderService orderService
@@ -69,7 +69,7 @@ public class ChatBot extends TelegramLongPollingBot {
                         .anyMatch(ba -> ba.getBotUserId().equals(userId));
 
                 if (isAdminUser) {
-                    handleAdminCommand(chatId, messageText, savingLocalDate, update);
+                    handleAdminCommand(chatId, messageText, savingLocalDate);
                 } else {
                     handleUserCommand(chatId, messageText);
                 }
@@ -79,19 +79,97 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate, Update update) {
-        Map<String, Runnable> commands = getStringRunnableMap(chatId);
+    private void sendSaleSubMenu(Long chatId) {
+        ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
-        if ("/start".equals(messageText)) {
-            sendAdminMainMenu(update.getMessage());
-        } else if (commands.containsKey(messageText)) {
-            commands.get(messageText).run();
-        } else {
-            saveEggCount(chatId, messageText, savingLocalDate);
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add(new KeyboardButton("Замовлення"));
+        row1.add(new KeyboardButton("Додати на продаж"));
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add(new KeyboardButton("⬅ Назад"));
+
+        List<KeyboardRow> keyboard = new ArrayList<>();
+        keyboard.add(row1);
+        keyboard.add(row2);
+
+        replyKeyboardMarkup.setKeyboard(keyboard);
+        replyKeyboardMarkup.setResizeKeyboard(true);
+        replyKeyboardMarkup.setOneTimeKeyboard(false);
+
+        SendMessage sendMessage = new SendMessage();
+        sendMessage.setChatId(chatId.toString());
+        sendMessage.setText("Оберіть дію:");
+        sendMessage.setReplyMarkup(replyKeyboardMarkup);
+
+        try {
+            execute(sendMessage);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
         }
     }
 
-    private void sendAdminMainMenu(Message message) {
+
+    private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate) {
+        Map<String, Runnable> commands = getStringRunnableMap(chatId);
+        AdminAction state = adminStates.getOrDefault(chatId, AdminAction.NONE);
+
+        switch (messageText) {
+            case "На продаж":
+                sendSaleSubMenu(chatId);
+                return;
+            case "Додати на продаж":
+                sendMessage(chatId, "Введіть кількість яєць для продажу:");
+                adminStates.put(chatId, AdminAction.WAITING_FOR_STOCK_INPUT);
+                return;
+            case "Додати яйця":
+                sendMessage(chatId, "Введіть кількість яєць:");
+                adminStates.put(chatId, AdminAction.WAITING_FOR_NEW_EGGS);
+                return;
+            case "/start":
+            case "⬅ Назад":
+                adminStates.put(chatId, AdminAction.NONE);
+                sendAdminMainMenu(chatId);
+                return;
+        }
+
+        if (state == AdminAction.WAITING_FOR_NEW_EGGS || state == AdminAction.WAITING_FOR_STOCK_INPUT) {
+            try {
+                int quantity = Integer.parseInt(messageText);
+
+                if (state == AdminAction.WAITING_FOR_NEW_EGGS) {
+                    saveEggCount(chatId, messageText, savingLocalDate);
+                    sendMessage(chatId, "✅ Додано " + quantity + " яєць.");
+                } else {
+                    Sales sales = salesService.getAmoutToSale(LocalDate.now());
+                    if (sales == null) {
+                        sales = new Sales();
+                    }
+                    sales.setAmountToSale(quantity);
+                    sales.setDateToThisAmount(LocalDate.now());
+                    salesService.saveAmountToSale(sales);
+                    sendMessage(chatId, "✅ Додано на продаж " + quantity + " яєць.");
+                }
+
+                adminStates.put(chatId, AdminAction.NONE);
+                sendAdminMainMenu(chatId);
+            } catch (NumberFormatException e) {
+                sendMessage(chatId, "❗ Введіть коректне число. Наприклад: 30");
+            }
+            return;
+        }
+
+        if (commands.containsKey(messageText)) {
+            adminStates.put(chatId, AdminAction.NONE);
+            commands.get(messageText).run();
+            return;
+        }
+
+        sendMessage(chatId, "⚠️ Невідома команда або формат. Спробуйте ще раз.");
+    }
+
+
+    private void sendAdminMainMenu(Long chatId) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
         KeyboardRow row1 = new KeyboardRow();
@@ -99,7 +177,7 @@ public class ChatBot extends TelegramLongPollingBot {
         row1.add(new KeyboardButton("Вчора"));
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton("Тижні(Поточний місяць)"));
+        row2.add(new KeyboardButton("Додати яйця"));
         row2.add(new KeyboardButton("Місяці"));
 
         KeyboardRow row3 = new KeyboardRow();
@@ -115,7 +193,7 @@ public class ChatBot extends TelegramLongPollingBot {
         replyKeyboardMarkup.setOneTimeKeyboard(false);
 
         SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(message.getChatId().toString());
+        sendMessage.setChatId(chatId);
         sendMessage.setText("Показати статистику за:");
         sendMessage.setReplyMarkup(replyKeyboardMarkup);
 
@@ -127,6 +205,10 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void handleUserCommand(Long chatId, String text) {
+        if ("⬅ Назад".equals(text)) {
+            sendUserMainMenu(chatId);
+            return;
+        }
         switch (text) {
             case "Зробити замовлення":
                 sendQuantitySelectionMenu(chatId);
@@ -138,9 +220,15 @@ public class ChatBot extends TelegramLongPollingBot {
             case "40":
             case "50":
             case "60":
-                pendingOrders.put(chatId, Integer.parseInt(text));
-                askForNameAndPhone(chatId);
+                saveOrder(chatId, Integer.parseInt(text), text);
+                sendConfirmation(chatId);
                 break;
+            case "На продаж":
+                sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now())));
+                break;
+            case "/start":
+                sendUserMainMenu(chatId);
+                return;
             default:
                 if (pendingOrders.containsKey(chatId)) {
                     saveOrder(chatId, pendingOrders.get(chatId), text);
@@ -163,42 +251,46 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void saveOrder(Long chatId, int quantity, String contactInfo) {
-        String name;
-        String phoneNumber;
-        String[] userInfo = contactInfo.split(",");
+        String name = null;
+        String phoneNumber = null;
 
-        if (userInfo.length == 2 && isValidPhoneNumber(userInfo[1])) {
+        List<Order> orders = orderService.getOrderByChatId(chatId);
+
+        if (!orders.isEmpty()) {
+            Order anyOrder = orders.get(0);
+            name = anyOrder.getUserName();
+            phoneNumber = anyOrder.getPhoneNumber();
+        } else {
+            askForNameAndPhone(chatId);
+            String[] userInfo = contactInfo.split(",");
+            if (userInfo.length != 2 || !isValidPhoneNumber(userInfo[1])) {
+                sendMessage(chatId, "❌ Некоректні контактні дані. Введіть у форматі: Ім'я,Телефон");
+                return;
+            }
             name = userInfo[0].trim();
             phoneNumber = userInfo[1].trim();
-        } else {
-            sendMessage(chatId, "❌ Некоректні контактні дані. Введіть у форматі: Ім'я,Телефон");
-            return;
         }
 
-        List<Order> ordersByPhone = orderService.getOrderByPhone(phoneNumber);
-
-        boolean updated = false;
-
-        for (Order existingOrder : ordersByPhone) {
+        for (Order existingOrder : orders) {
             if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
                 existingOrder.setAmount(existingOrder.getAmount() + quantity);
                 orderService.saveOrder(existingOrder);
-                updated = true;
-                break;
+                sendMessage(chatId, "✅ Ваше поточне замовлення оновлено.");
+                return;
             }
         }
 
-        if (!updated) {
-            Order newOrder = new Order();
-            newOrder.setAmount(quantity);
-            newOrder.setPhoneNumber(phoneNumber);
-            newOrder.setUserName(name);
-            newOrder.setStatus(OrderStatus.NEW);
-            orderService.saveOrder(newOrder);
-        }
+        Order newOrder = new Order();
+        newOrder.setAmount(quantity);
+        newOrder.setPhoneNumber(phoneNumber);
+        newOrder.setUserName(name);
+        newOrder.setChatId(chatId);
+        newOrder.setStatus(OrderStatus.NEW);
+        orderService.saveOrder(newOrder);
 
-        System.out.printf("✅ Замовлення: %d яєць від %d, контакт: %s%n", quantity, chatId, contactInfo);
+        sendMessage(chatId, "✅ Нове замовлення прийнято. Дякуємо!");
     }
+
 
 
     private void sendUserMainMenu(Long chatId) {
@@ -217,7 +309,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId.toString());
-        sendMessage.setText("В наявності:");
+        sendMessage.setText("Оберіть пункт нижче");
         sendMessage.setReplyMarkup(replyKeyboardMarkup);
 
         try {
@@ -254,7 +346,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("10"), new KeyboardButton("15"), new KeyboardButton("20"))));
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("30"), new KeyboardButton("40"), new KeyboardButton("50"))));
-        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"), new KeyboardButton("Повернутись назад"))));
+        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"), new KeyboardButton("⬅ Назад"))));
 
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
@@ -289,14 +381,13 @@ public class ChatBot extends TelegramLongPollingBot {
     private Map<String, Runnable> getStringRunnableMap(Long chatId) {
         List<Counter> allStatistic = counterService.getAllStatistic();
 
-        Map<String, Runnable> commands = Map.of(
+        return Map.of(
                 "Сьогодні", () -> sendDayAmount(chatId, LocalDate.now(), formatDayStatistic("сьогодні")),
                 "Вчора", () -> sendDayAmount(chatId, LocalDate.now().minusDays(1), formatDayStatistic("вчора")),
                 "Місяці", () -> sendMessage(chatId, formatMonthStatistic(counterService.calculateAmountByMonth(allStatistic))),
                 "Тижні(Поточний місяць)", () -> sendMessage(chatId, formatWeekStatistic(counterService.calculateAmountByWeek(allStatistic))),
                 "На продаж", () -> sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now())))
         );
-        return commands;
     }
 
     private String formatDayStatistic(String dayLabel) {

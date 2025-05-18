@@ -2,10 +2,12 @@ package ua.maks.prog.bot;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
+import ua.maks.prog.TelBotApplication;
 
 @Component
 public class BotInitializer implements CommandLineRunner {
@@ -26,6 +28,11 @@ public class BotInitializer implements CommandLineRunner {
         } catch (TelegramApiException e) {
             System.err.println("❌ Bot registration failed: " + e.getMessage());
         }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        SpringApplication.run(TelBotApplication.class, args);
+        Thread.currentThread().join();
     }
 }
 

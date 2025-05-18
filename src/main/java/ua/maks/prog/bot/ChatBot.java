@@ -301,6 +301,9 @@ public class ChatBot extends TelegramLongPollingBot {
         }
 
         switch (text) {
+            case "📦 Мої замовлення":
+                sendUserOrderHistory(chatId);
+                return;
             case "Зробити замовлення":
                 sendQuantitySelectionMenu(chatId);
                 return;
@@ -319,6 +322,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 } else {
                     saveOrder(chatId, new UserData(quantity), orders);
                     sendConfirmation(chatId);
+                   sendUserMainMenu(chatId);
                 }
                 return;
 
@@ -358,6 +362,29 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendUserOrderHistory(Long chatId) {
+        List<Order> userOrders = orderService.getOrderByChatId(chatId);
+
+        if (userOrders.isEmpty()) {
+            sendMessage(chatId, "У вас ще немає замовлень.");
+            return;
+        }
+
+        StringBuilder message = new StringBuilder("Ваші замовлення:\n\n");
+        for (Order order : userOrders) {
+            message.append(String.format(
+                    "#%d — %d шт — %s\n",
+                    order.getChatId(),
+                    order.getAmount(),
+                    order.getStatus() == OrderStatus.NEW ? "🟡 НОВЕ" : "✅ ВИКОНАНО"
+            ));
+        }
+
+        message.append("\n⬅ Назад");
+
+        sendMessage(chatId, message.toString());
+    }
+
     private void saveOrder(Long chatId, UserData userData, List<Order> orders) {
         String existingPhoneNumber = null;
         if(!orders.isEmpty()) {
@@ -381,29 +408,31 @@ public class ChatBot extends TelegramLongPollingBot {
         sendMessage(chatId, "✅ Нове замовлення прийнято. Дякуємо!");
     }
 
-
-
     private void sendUserMainMenu(Long chatId) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton("На продаж"));
-        row1.add(new KeyboardButton("Зробити замовлення"));
-
         List<KeyboardRow> keyboard = new ArrayList<>();
+
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add(new KeyboardButton("Зробити замовлення"));
+        row1.add(new KeyboardButton("📦 Мої замовлення"));
         keyboard.add(row1);
+
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add(new KeyboardButton("На продаж"));
+        keyboard.add(row2);
 
         replyKeyboardMarkup.setKeyboard(keyboard);
         replyKeyboardMarkup.setResizeKeyboard(true);
-        replyKeyboardMarkup.setOneTimeKeyboard(false);
+        replyKeyboardMarkup.setOneTimeKeyboard(false); // <- щоб не зникала
 
-        SendMessage sendMessage = new SendMessage();
-        sendMessage.setChatId(chatId.toString());
-        sendMessage.setText("Оберіть пункт нижче");
-        sendMessage.setReplyMarkup(replyKeyboardMarkup);
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("Оберіть дію:");
+        message.setReplyMarkup(replyKeyboardMarkup);
 
         try {
-            execute(sendMessage);
+            execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }

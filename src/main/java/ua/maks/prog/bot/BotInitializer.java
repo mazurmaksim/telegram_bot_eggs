@@ -1,5 +1,6 @@
 package ua.maks.prog.bot;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -22,6 +23,18 @@ public class BotInitializer implements CommandLineRunner {
             botsApi.registerBot(bot);
             System.out.println("✅ Telegram bot successfully started!");
         } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+    @PostConstruct
+    public void init() {
+        System.out.println("✅ Bot init start");
+        try {
+            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+            botsApi.registerBot(bot);
+            System.out.println("✅ Bot successfully registered");
+        } catch (Exception e) {
+            System.err.println("❌ Telegram bot error: " + e.getMessage());
             e.printStackTrace();
         }
     }

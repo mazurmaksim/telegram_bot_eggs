@@ -2,11 +2,14 @@ package ua.maks.prog.bot;
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
+import org.aspectj.weaver.ast.Or;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -59,6 +62,24 @@ public class ChatBot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         try {
+            if (update.hasCallbackQuery()) {
+                String data = update.getCallbackQuery().getData();
+                Long adminChatId = update.getCallbackQuery().getMessage().getChatId();
+                if (data.startsWith("complete_order:")) {
+                    String phoneNumber = data.replace("complete_order:", "");
+                    List<Order> order = orderService.getOrderById(UUID.fromString(phoneNumber));
+                    order.forEach(o-> {
+                        if (o.getStatus().getLabel().equals("New")) {
+                            handleOrderCompletion(o, adminChatId);
+                        }
+                    });
+                }
+
+                if ("admin_back".equals(data)) {
+                    sendAdminMainMenu(adminChatId);
+                }
+            }
+
             if (update.hasMessage() && update.getMessage().hasText()) {
                 Long chatId = update.getMessage().getChatId();
                 Long userId = update.getMessage().getFrom().getId();
@@ -116,6 +137,9 @@ public class ChatBot extends TelegramLongPollingBot {
         AdminAction state = adminStates.getOrDefault(chatId, AdminAction.NONE);
 
         switch (messageText) {
+            case "Замовлення" :
+                sendOrderListInline(chatId);
+                return;
             case "На продаж":
                 sendSaleSubMenu(chatId);
                 return;
@@ -169,6 +193,69 @@ public class ChatBot extends TelegramLongPollingBot {
         sendMessage(chatId, "⚠️ Невідома команда або формат. Спробуйте ще раз.");
     }
 
+    private void sendOrderListInline(Long chatId) {
+        List<Order> newOrders = orderService.getOrderByStatus(OrderStatus.NEW);
+
+        if (newOrders.isEmpty()) {
+            sendMessage(chatId, "📭 Нових замовлень немає.");
+            return;
+        }
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        for (Order order : newOrders) {
+            InlineKeyboardButton button = new InlineKeyboardButton();
+            button.setText("✅ тел. " + order.getPhoneNumber() + " :: " +
+                    " " + order.getAmount() + " яєць. 🥚");
+            button.setCallbackData("complete_order:" + order.getId());
+
+            rows.add(List.of(button));
+        }
+
+        InlineKeyboardButton backButton = new InlineKeyboardButton("⬅ Назад");
+        backButton.setCallbackData("admin_back");
+        rows.add(List.of(backButton));
+
+        markup.setKeyboard(rows);
+
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId.toString());
+        message.setText("Оберіть замовлення, яке виконано:");
+        message.setReplyMarkup(markup);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleOrderCompletion(Order order, Long adminChatId) {
+
+        if (order == null) {
+            sendMessage(adminChatId, "⚠️ Замовлення не знайдено.");
+            return;
+        }
+
+        if (OrderStatus.COMPLETED.equals(order.getStatus())) {
+            sendMessage(adminChatId, "⚠️ Це замовлення вже виконано.");
+            return;
+        }
+
+        order.setStatus(OrderStatus.COMPLETED);
+        orderService.saveOrder(order);
+
+        sendMessage(adminChatId, "✅ Замовлення # " + order.getPhoneNumber() + " відмічено як виконане.");
+
+        String userMsg = String.format(
+                "✅ Ваше замовлення на %d яєць готове до отримання!",
+                order.getAmount()
+        );
+        sendMessage(order.getChatId(), userMsg);
+
+        sendOrderListInline(adminChatId);
+    }
 
     private void sendAdminMainMenu(Long chatId) {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
@@ -261,8 +348,6 @@ public class ChatBot extends TelegramLongPollingBot {
         sendUserMainMenu(chatId);
     }
 
-
-
     public static boolean isValidPhoneNumber(String phone) {
         try {
             PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
@@ -274,19 +359,22 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void saveOrder(Long chatId, UserData userData, List<Order> orders) {
-        String phoneNumber = null;
-
-        for (Order existingOrder : orders) {
-            if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
-                existingOrder.setAmount(existingOrder.getAmount() + userData.getAmount());
-                orderService.saveOrder(existingOrder);
-                sendMessage(chatId, "✅ Ваше поточне замовлення оновлено.");
-                return;
+        String existingPhoneNumber = null;
+        if(!orders.isEmpty()) {
+            for (Order existingOrder : orders) {
+                if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
+                    existingOrder.setAmount(existingOrder.getAmount() + userData.getAmount());
+                    orderService.saveOrder(existingOrder);
+                    sendMessage(chatId, "✅ Ваше поточне замовлення оновлено.");
+                    return;
+                } else {
+                    existingPhoneNumber = existingOrder.getPhoneNumber();
+                }
             }
         }
         Order newOrder = new Order();
         newOrder.setAmount(userData.getAmount());
-        newOrder.setPhoneNumber(userData.getPhoneNumber());
+        newOrder.setPhoneNumber(existingPhoneNumber ==null ?userData.getPhoneNumber():existingPhoneNumber);
         newOrder.setChatId(chatId);
         newOrder.setStatus(OrderStatus.NEW);
         orderService.saveOrder(newOrder);

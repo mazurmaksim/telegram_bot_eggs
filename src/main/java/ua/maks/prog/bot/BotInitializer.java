@@ -8,7 +8,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 @Component
-public class BotInitializer implements CommandLineRunner {
+public class BotInitializer {
 
     private final ChatBot bot;
 
@@ -16,26 +16,17 @@ public class BotInitializer implements CommandLineRunner {
         this.bot = bot;
     }
 
-    @Override
-    public void run(String... args) {
-        try {
-            TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-            botsApi.registerBot(bot);
-            System.out.println("✅ Telegram bot successfully started!");
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
-        }
-    }
     @PostConstruct
     public void init() {
-        System.out.println("✅ Bot init start");
+        System.out.println("✅ Bot init started");
         try {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
             botsApi.registerBot(bot);
             System.out.println("✅ Bot successfully registered");
         } catch (Exception e) {
-            System.err.println("❌ Telegram bot error: " + e.getMessage());
+            System.err.println("❌ Bot registration failed: " + e.getMessage());
             e.printStackTrace();
         }
     }
 }
+

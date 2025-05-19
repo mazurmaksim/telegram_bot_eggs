@@ -1,18 +1,6 @@
 package ua.maks.prog.service;
 
 import org.springframework.stereotype.Service;
-import ua.maks.prog.entity.Counter;
-import ua.maks.prog.views.StatisticView;
-
-import javax.imageio.ImageIO;
-import java.io.File;
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.time.Month;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class StatisticGeneratorService {

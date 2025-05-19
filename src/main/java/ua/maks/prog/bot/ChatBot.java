@@ -2,7 +2,6 @@ package ua.maks.prog.bot;
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
-import org.aspectj.weaver.ast.Or;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -14,14 +13,15 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.maks.prog.config.BotConfig;
+import ua.maks.prog.config.BotMessages;
 import ua.maks.prog.entity.Counter;
 import ua.maks.prog.entity.Order;
 import ua.maks.prog.entity.Sales;
 import ua.maks.prog.model.UserData;
 import ua.maks.prog.service.*;
-import ua.maks.prog.views.AdminAction;
-import ua.maks.prog.views.MonthView;
-import ua.maks.prog.views.OrderStatus;
+import ua.maks.prog.enums.AdminAction;
+import ua.maks.prog.enums.MonthView;
+import ua.maks.prog.enums.OrderStatus;
 
 import java.time.*;
 import java.util.*;
@@ -35,11 +35,13 @@ public class ChatBot extends TelegramLongPollingBot {
     private final SalesService salesService;
     private final BotAdminService botAdminService;
     private final OrderService orderService;
+    private final BotMessages messages;
     private final Map<Long, UserData> pendingOrders = new HashMap<>();
     private final Map<Long, AdminAction> adminStates = new HashMap<>();
 
     public ChatBot(BotConfig botConfig, EggsService eggsService, CounterService counterService,
-                   SalesService salesService, BotAdminService botAdminService, OrderService orderService
+                   SalesService salesService, BotAdminService botAdminService, OrderService orderService,
+                   BotMessages botMessages
     ) {
         this.botConfig = botConfig;
         this.eggsService = eggsService;
@@ -47,6 +49,7 @@ public class ChatBot extends TelegramLongPollingBot {
         this.salesService = salesService;
         this.botAdminService = botAdminService;
         this.orderService = orderService;
+        this.messages = botMessages;
     }
 
     @Override
@@ -91,13 +94,14 @@ public class ChatBot extends TelegramLongPollingBot {
                         .anyMatch(ba -> ba.getBotUserId().equals(userId));
 
                 if (isAdminUser) {
-                    handleAdminCommand(chatId, messageText, savingLocalDate);
+                    handleAdminCommand(chatId, messageText, savingLocalDate, isAdminUser);
                 } else {
                     handleUserCommand(chatId, messageText);
                 }
             }
         } catch (Exception e) {
-            sendMessage(update.getMessage().getChatId(), "Дані не збереглись, повинно бути число: " + e.getMessage());
+            sendMessage(update.getMessage().getChatId(),
+                    messages.getAdmin().getMenu().getDataNotSaved() + e.getMessage());
         }
     }
 
@@ -105,11 +109,11 @@ public class ChatBot extends TelegramLongPollingBot {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton("Замовлення"));
-        row1.add(new KeyboardButton("Додати на продаж"));
+        row1.add(new KeyboardButton(messages.getAdmin().getMenu().getOrder()));
+        row1.add(new KeyboardButton(messages.getAdmin().getMenu().getAddToSale()));
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton("⬅ Назад"));
+        row2.add(new KeyboardButton(messages.getCommon().getBack()));
 
         List<KeyboardRow> keyboard = new ArrayList<>();
         keyboard.add(row1);
@@ -121,7 +125,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId.toString());
-        sendMessage.setText("Оберіть дію:");
+        sendMessage.setText(messages.getUser().getMenu().getPrompt());
         sendMessage.setReplyMarkup(replyKeyboardMarkup);
 
         try {
@@ -132,31 +136,9 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
 
-    private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate) {
+    private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate, boolean isAdmin) {
         Map<String, Runnable> commands = getStringRunnableMap(chatId);
         AdminAction state = adminStates.getOrDefault(chatId, AdminAction.NONE);
-
-        switch (messageText) {
-            case "Замовлення" :
-                sendOrderListInline(chatId);
-                return;
-            case "На продаж":
-                sendSaleSubMenu(chatId);
-                return;
-            case "Додати на продаж":
-                sendMessage(chatId, "Введіть кількість яєць для продажу:");
-                adminStates.put(chatId, AdminAction.WAITING_FOR_STOCK_INPUT);
-                return;
-            case "Додати яйця":
-                sendMessage(chatId, "Введіть кількість яєць:");
-                adminStates.put(chatId, AdminAction.WAITING_FOR_NEW_EGGS);
-                return;
-            case "/start":
-            case "⬅ Назад":
-                adminStates.put(chatId, AdminAction.NONE);
-                sendAdminMainMenu(chatId);
-                return;
-        }
 
         if (state == AdminAction.WAITING_FOR_NEW_EGGS || state == AdminAction.WAITING_FOR_STOCK_INPUT) {
             try {
@@ -164,7 +146,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
                 if (state == AdminAction.WAITING_FOR_NEW_EGGS) {
                     saveEggCount(chatId, messageText, savingLocalDate);
-                    sendMessage(chatId, "✅ Додано " + quantity + " яєць.");
+                    sendMessage(chatId, messages.getAdmin().getMenu().getAdded() + quantity + messages.getCommon().getEggs());
                 } else {
                     Sales sales = salesService.getAmoutToSale(LocalDate.now());
                     if (sales == null) {
@@ -173,31 +155,36 @@ public class ChatBot extends TelegramLongPollingBot {
                     sales.setAmountToSale(quantity);
                     sales.setDateToThisAmount(LocalDate.now());
                     salesService.saveAmountToSale(sales);
-                    sendMessage(chatId, "✅ Додано на продаж " + quantity + " яєць.");
+                    sendMessage(chatId, messages.getAdmin().getMenu().getAddedToSale() + quantity + messages.getCommon().getEggs());
                 }
 
                 adminStates.put(chatId, AdminAction.NONE);
                 sendAdminMainMenu(chatId);
             } catch (NumberFormatException e) {
-                sendMessage(chatId, "❗ Введіть коректне число. Наприклад: 30");
+                sendMessage(chatId, messages.getAdmin().getMenu().getInputCorrectNum());
             }
             return;
         }
 
-        if (commands.containsKey(messageText)) {
-            adminStates.put(chatId, AdminAction.NONE);
-            commands.get(messageText).run();
+        Runnable command = commands.get(messageText);
+        if (command != null) {
+            command.run();
             return;
         }
 
-        sendMessage(chatId, "⚠️ Невідома команда або формат. Спробуйте ще раз.");
+        if (isAdmin) {
+            sendAdminMainMenu(chatId);
+            sendMessage(chatId, messages.getAdmin().getMenu().getAdminCongrats());
+        } else {
+            sendMessage(chatId, messages.getAdmin().getMenu().getUnknownCommand());
+        }
     }
 
     private void sendOrderListInline(Long chatId) {
         List<Order> newOrders = orderService.getOrderByStatus(OrderStatus.NEW);
 
         if (newOrders.isEmpty()) {
-            sendMessage(chatId, "📭 Нових замовлень немає.");
+            sendMessage(chatId, messages.getAdmin().getMenu().getNoOrders());
             return;
         }
 
@@ -206,14 +193,14 @@ public class ChatBot extends TelegramLongPollingBot {
 
         for (Order order : newOrders) {
             InlineKeyboardButton button = new InlineKeyboardButton();
-            button.setText("✅ тел. " + order.getPhoneNumber() + " :: " +
-                    " " + order.getAmount() + " яєць. 🥚");
+            button.setText(messages.getAdmin().getMenu().getTelNumSign() + order.getPhoneNumber() + " :: " +
+                    " " + order.getAmount() + messages.getCommon().getEggs());
             button.setCallbackData("complete_order:" + order.getId());
 
             rows.add(List.of(button));
         }
 
-        InlineKeyboardButton backButton = new InlineKeyboardButton("⬅ Назад");
+        InlineKeyboardButton backButton = new InlineKeyboardButton(messages.getCommon().getBack());
         backButton.setCallbackData("admin_back");
         rows.add(List.of(backButton));
 
@@ -221,7 +208,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText("Оберіть замовлення, яке виконано:");
+        message.setText(messages.getAdmin().getMenu().getSelectCompletedOrder());
         message.setReplyMarkup(markup);
 
         try {
@@ -234,22 +221,22 @@ public class ChatBot extends TelegramLongPollingBot {
     private void handleOrderCompletion(Order order, Long adminChatId) {
 
         if (order == null) {
-            sendMessage(adminChatId, "⚠️ Замовлення не знайдено.");
+            sendMessage(adminChatId, messages.getAdmin().getMenu().getNotFoundOrder());
             return;
         }
 
         if (OrderStatus.COMPLETED.equals(order.getStatus())) {
-            sendMessage(adminChatId, "⚠️ Це замовлення вже виконано.");
+            sendMessage(adminChatId, messages.getAdmin().getMenu().getOrderAlreadyCompleted());
             return;
         }
 
         order.setStatus(OrderStatus.COMPLETED);
         orderService.saveOrder(order);
 
-        sendMessage(adminChatId, "✅ Замовлення # " + order.getPhoneNumber() + " відмічено як виконане.");
+        sendMessage(adminChatId, String.format(messages.getAdmin().getMenu().getCompletedOrder(), order.getPhoneNumber()));
 
         String userMsg = String.format(
-                "✅ Ваше замовлення на %d яєць готове до отримання!",
+                messages.getAdmin().getMenu().getYourOrderReady(),
                 order.getAmount()
         );
         sendMessage(order.getChatId(), userMsg);
@@ -261,15 +248,15 @@ public class ChatBot extends TelegramLongPollingBot {
         ReplyKeyboardMarkup replyKeyboardMarkup = new ReplyKeyboardMarkup();
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton("Сьогодні"));
-        row1.add(new KeyboardButton("Вчора"));
+        row1.add(new KeyboardButton(messages.getAdmin().getMenu().getToday()));
+        row1.add(new KeyboardButton(messages.getAdmin().getMenu().getYesterday()));
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton("Додати яйця"));
-        row2.add(new KeyboardButton("Місяці"));
+        row2.add(new KeyboardButton(messages.getAdmin().getMenu().getAddEggs()));
+        row2.add(new KeyboardButton(messages.getAdmin().getMenu().getMonths()));
 
         KeyboardRow row3 = new KeyboardRow();
-        row3.add(new KeyboardButton("На продаж"));
+        row3.add(new KeyboardButton(messages.getCommon().getToSale()));
 
         List<KeyboardRow> keyboard = new ArrayList<>();
         keyboard.add(row1);
@@ -282,7 +269,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         SendMessage sendMessage = new SendMessage();
         sendMessage.setChatId(chatId);
-        sendMessage.setText("Показати статистику за:");
+        sendMessage.setText(messages.getAdmin().getMenu().getShowStatisticFrom());
         sendMessage.setReplyMarkup(replyKeyboardMarkup);
 
         try {
@@ -295,48 +282,41 @@ public class ChatBot extends TelegramLongPollingBot {
     private void handleUserCommand(Long chatId, String text) {
         List<Order> orders = orderService.getOrderByChatId(chatId);
 
-        if ("/start".equals(text) || "⬅ Назад".equals(text)) {
+        if ("/start".equals(text) || messages.getCommon().getBack().equals(text)) {
             sendUserMainMenu(chatId);
             return;
         }
 
-        switch (text) {
-            case "📦 Мої замовлення":
-                sendUserOrderHistory(chatId);
-                return;
-            case "Зробити замовлення":
-                sendQuantitySelectionMenu(chatId);
-                return;
+        Map<String, Runnable> commandMap = Map.of(
+                messages.getUser().getMenu().getMyOrders(), () -> sendUserOrderHistory(chatId),
+                messages.getUser().getMenu().getDoOrder(), () -> sendQuantitySelectionMenu(chatId),
+                messages.getCommon().getToSale(), () -> sendMessage(chatId, formatSalesStatistic(
+                        salesService.getAmoutToSale(LocalDate.now())))
+        );
 
-            case "10":
-            case "15":
-            case "20":
-            case "30":
-            case "40":
-            case "50":
-            case "60":
-                int quantity = Integer.parseInt(text);
-                if (orders.isEmpty()) {
-                    askForPhone(chatId);
-                    pendingOrders.put(chatId, new UserData(quantity));
-                } else {
-                    saveOrder(chatId, new UserData(quantity), orders);
-                    sendConfirmation(chatId);
-                   sendUserMainMenu(chatId);
-                }
-                return;
+        if (commandMap.containsKey(text)) {
+            commandMap.get(text).run();
+            return;
+        }
 
-            case "На продаж":
-                String stat = formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now()));
-                sendMessage(chatId, stat);
-                return;
+        List<String> quantities = List.of("10", "15", "20", "30", "40", "50", "60");
+        if (quantities.contains(text)) {
+            int quantity = Integer.parseInt(text);
+            if (orders.isEmpty()) {
+                askForPhone(chatId);
+                pendingOrders.put(chatId, new UserData(quantity));
+            } else {
+                saveOrder(chatId, new UserData(quantity), orders);
+                sendConfirmation(chatId);
+                sendUserMainMenu(chatId);
+            }
+            return;
         }
 
         if (pendingOrders.containsKey(chatId)) {
             String phone = text.trim();
-
             if (!isValidPhoneNumber(phone)) {
-                sendMessage(chatId, "❌ Невірний формат номера. Введіть у форматі: +380XXXXXXXXX");
+                sendMessage(chatId, messages.getUser().getMenu().getInvalidPhone());
                 return;
             }
 
@@ -366,21 +346,22 @@ public class ChatBot extends TelegramLongPollingBot {
         List<Order> userOrders = orderService.getOrderByChatId(chatId);
 
         if (userOrders.isEmpty()) {
-            sendMessage(chatId, "У вас ще немає замовлень.");
+            sendMessage(chatId, messages.getUser().getMenu().getOrderListEmpty());
             return;
         }
 
-        StringBuilder message = new StringBuilder("Ваші замовлення:\n\n");
+        StringBuilder message = new StringBuilder(messages.getUser().getMenu().getOrderListTitle()+ "\n\n");
         for (Order order : userOrders) {
             message.append(String.format(
-                    "#%d — %d шт — %s\n",
+                    messages.getUser().getMenu().getOrderAmount(),
                     order.getChatId(),
                     order.getAmount(),
-                    order.getStatus() == OrderStatus.NEW ? "🟡 НОВЕ" : "✅ ВИКОНАНО"
+                    order.getStatus() == OrderStatus.NEW ? messages.getUser().getMenu().getNewOrder() : messages.getUser().getMenu().getDoneOrder()
             ));
         }
 
-        message.append("\n⬅ Назад");
+        message.append("\n")
+                .append(messages.getCommon().getBack());
 
         sendMessage(chatId, message.toString());
     }
@@ -392,7 +373,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 if (OrderStatus.NEW.equals(existingOrder.getStatus())) {
                     existingOrder.setAmount(existingOrder.getAmount() + userData.getAmount());
                     orderService.saveOrder(existingOrder);
-                    sendMessage(chatId, "✅ Ваше поточне замовлення оновлено.");
+                    sendMessage(chatId, messages.getUser().getMenu().getOrderUpdated());
                     return;
                 } else {
                     existingPhoneNumber = existingOrder.getPhoneNumber();
@@ -405,7 +386,7 @@ public class ChatBot extends TelegramLongPollingBot {
         newOrder.setChatId(chatId);
         newOrder.setStatus(OrderStatus.NEW);
         orderService.saveOrder(newOrder);
-        sendMessage(chatId, "✅ Нове замовлення прийнято. Дякуємо!");
+        sendMessage(chatId, messages.getUser().getMenu().getOrderCreated());
     }
 
     private void sendUserMainMenu(Long chatId) {
@@ -414,21 +395,21 @@ public class ChatBot extends TelegramLongPollingBot {
         List<KeyboardRow> keyboard = new ArrayList<>();
 
         KeyboardRow row1 = new KeyboardRow();
-        row1.add(new KeyboardButton("Зробити замовлення"));
-        row1.add(new KeyboardButton("📦 Мої замовлення"));
+        row1.add(new KeyboardButton(messages.getUser().getMenu().getDoOrder()));
+        row1.add(new KeyboardButton(messages.getUser().getMenu().getMyOrders()));
         keyboard.add(row1);
 
         KeyboardRow row2 = new KeyboardRow();
-        row2.add(new KeyboardButton("На продаж"));
+        row2.add(new KeyboardButton(messages.getCommon().getToSale()));
         keyboard.add(row2);
 
         replyKeyboardMarkup.setKeyboard(keyboard);
         replyKeyboardMarkup.setResizeKeyboard(true);
-        replyKeyboardMarkup.setOneTimeKeyboard(false); // <- щоб не зникала
+        replyKeyboardMarkup.setOneTimeKeyboard(false);
 
         SendMessage message = new SendMessage();
         message.setChatId(chatId.toString());
-        message.setText("Оберіть дію:");
+        message.setText(messages.getUser().getMenu().getPrompt());
         message.setReplyMarkup(replyKeyboardMarkup);
 
         try {
@@ -439,7 +420,7 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void askForPhone(Long chatId) {
-        SendMessage msg = new SendMessage(chatId.toString(), "Введіть телефону:");
+        SendMessage msg = new SendMessage(chatId.toString(), messages.getUser().getMenu().getAskPhone());
         msg.setParseMode("Markdown");
 
         try {
@@ -450,7 +431,7 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private void sendConfirmation(Long chatId) {
-        SendMessage msg = new SendMessage(chatId.toString(), "✅ Дякуємо! Ваше замовлення прийнято. Очікуйте дзвінка.");
+        SendMessage msg = new SendMessage(chatId.toString(), messages.getUser().getMenu().getOrderCreated());
 
         try {
             execute(msg);
@@ -465,13 +446,13 @@ public class ChatBot extends TelegramLongPollingBot {
 
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("10"), new KeyboardButton("15"), new KeyboardButton("20"))));
         keyboard.add(new KeyboardRow(List.of(new KeyboardButton("30"), new KeyboardButton("40"), new KeyboardButton("50"))));
-        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"), new KeyboardButton("⬅ Назад"))));
+        keyboard.add(new KeyboardRow(List.of(new KeyboardButton("60"), new KeyboardButton(messages.getCommon().getBack()))));
 
         markup.setKeyboard(keyboard);
         markup.setResizeKeyboard(true);
         markup.setOneTimeKeyboard(true);
 
-        SendMessage msg = new SendMessage(chatId.toString(), "🥚 Оберіть кількість яєць:");
+        SendMessage msg = new SendMessage(chatId.toString(), messages.getUser().getMenu().getSelectEggsAmount());
         msg.setReplyMarkup(markup);
 
         try {
@@ -483,7 +464,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
     private void saveEggCount(Long chatId, String messageText, LocalDateTime savingTime) {
         eggsService.addEgg(messageText, savingTime);
-        sendMessage(chatId, "💾 Кількість яєць збережена: " + messageText);
+        sendMessage(chatId, messages.getAdmin().getMenu().getSavedEggsAmount() + messageText);
     }
 
     private void sendMessage(Long chatId, String text) {
@@ -501,20 +482,23 @@ public class ChatBot extends TelegramLongPollingBot {
         List<Counter> allStatistic = counterService.getAllStatistic();
 
         return Map.of(
-                "Сьогодні", () -> sendDayAmount(chatId, LocalDate.now(), formatDayStatistic("сьогодні")),
-                "Вчора", () -> sendDayAmount(chatId, LocalDate.now().minusDays(1), formatDayStatistic("вчора")),
-                "Місяці", () -> sendMessage(chatId, formatMonthStatistic(counterService.calculateAmountByMonth(allStatistic))),
-                "Тижні(Поточний місяць)", () -> sendMessage(chatId, formatWeekStatistic(counterService.calculateAmountByWeek(allStatistic))),
-                "На продаж", () -> sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now())))
-        );
+                messages.getAdmin().getMenu().getToday(), () -> sendDayAmount(chatId, LocalDate.now(), formatDayStatistic(messages.getAdmin().getMenu().getToday().toLowerCase())),
+                messages.getAdmin().getMenu().getYesterday(), () -> sendDayAmount(chatId, LocalDate.now().minusDays(1), formatDayStatistic(messages.getAdmin().getMenu().getYesterday().toLowerCase())),
+                messages.getAdmin().getMenu().getMonths(), () -> sendMessage(chatId, formatMonthStatistic(counterService.calculateAmountByMonth(allStatistic))),
+                messages.getAdmin().getMenu().getAddedToSale(), () -> sendMessage(chatId, formatWeekStatistic(counterService.calculateAmountByWeek(allStatistic))),
+                messages.getCommon().getToSale(), () -> sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now()))),
+                messages.getAdmin().getMenu().getAddEggs(), () -> {
+                    sendMessage(chatId, messages.getAdmin().getMenu().getEnterAmountOfEggs());
+                    adminStates.put(chatId, AdminAction.WAITING_FOR_NEW_EGGS);
+                });
     }
 
     private String formatDayStatistic(String dayLabel) {
-        return String.format("📊 Показую статистику за %s\n📅 %s яєць: ", dayLabel, dayLabel.substring(0, 1).toUpperCase() + dayLabel.substring(1));
+        return String.format(messages.getAdmin().getMenu().getPeriodStatistic(), dayLabel, dayLabel.substring(0, 1).toUpperCase() + dayLabel.substring(1));
     }
 
     private String formatMonthStatistic(Map<Month, Integer> monthStatistic) {
-        StringBuilder monthBuilder = new StringBuilder("📊 Статистика по місяцям:\n\n");
+        StringBuilder monthBuilder = new StringBuilder(messages.getAdmin().getMenu().getStatByMonths());
         monthStatistic.forEach((month, amount) -> {
             if (amount != 0) {
                 monthBuilder.append("📅 ")
@@ -528,7 +512,7 @@ public class ChatBot extends TelegramLongPollingBot {
     }
 
     private String formatWeekStatistic(Map<Integer, Integer> monthsStatistic) {
-        StringBuilder weekStatBuilder = new StringBuilder("📊 Показую статистику за тижні:\n\n");
+        StringBuilder weekStatBuilder = new StringBuilder(messages.getAdmin().getMenu().getStatByWeeks());
         Map<Integer, Integer> weeksStatistic = new TreeMap<>();
 
         YearMonth currentMonth = YearMonth.now();
@@ -542,7 +526,7 @@ public class ChatBot extends TelegramLongPollingBot {
 
         weeksStatistic.forEach((week, amount) -> {
             if (week != 0 && amount != 0) {
-                weekStatBuilder.append("🗓 Тиждень ").append(week).append(": ").append(amount).append(" 🥚\n");
+                weekStatBuilder.append(messages.getAdmin().getMenu().getWeek()).append(week).append(": ").append(amount).append(" 🥚\n");
             }
         });
 
@@ -560,11 +544,11 @@ public class ChatBot extends TelegramLongPollingBot {
                     date.getYear()
             );
 
-            String amountString = String.format("\uD83E\uDD5A Доступно для продажу: %d шт.", amount);
+            String amountString = String.format(messages.getUser().getMenu().getAvailableFor(), amount);
 
             return dateString + System.lineSeparator() + amountString;
         } else {
-            return "\uD83D\uDE1E🥚 Нажаль, на продаж немає яєць 🥚\uD83D\uDE1E";
+            return messages.getUser().getMenu().getNotAvailableFor();
         }
     }
 
@@ -573,9 +557,9 @@ public class ChatBot extends TelegramLongPollingBot {
         counter.ifPresentOrElse(
                 c -> sendMessage(chatId, message + c.getAmount() +
                         System.lineSeparator() +
-                        "\uD83C\uDF21\uFE0F  Температура повітря: " +
+                        messages.getAdmin().getMenu().getAirTemperature() +
                         c.getWeatherForecast().getTemperature() + "°C"),
-                () -> sendMessage(chatId, "На сьогодні немає збереженої статистики")
+                () -> sendMessage(chatId, messages.getAdmin().getMenu().getNoStatistic())
         );
     }
 }

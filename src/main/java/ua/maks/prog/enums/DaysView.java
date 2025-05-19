@@ -1,4 +1,4 @@
-package ua.maks.prog.views;
+package ua.maks.prog.enums;
 
 public enum DaysView {
     MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY, TODAY;

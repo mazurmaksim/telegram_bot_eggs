@@ -2,7 +2,7 @@ package ua.maks.prog.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import ua.maks.prog.entity.Order;
-import ua.maks.prog.views.OrderStatus;
+import ua.maks.prog.enums.OrderStatus;
 
 import java.util.List;
 import java.util.UUID;

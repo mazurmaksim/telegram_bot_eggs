@@ -1,4 +1,4 @@
-package ua.maks.prog.views;
+package ua.maks.prog.enums;
 
 import java.util.Map;
 import java.util.stream.Collectors;

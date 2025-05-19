@@ -4,7 +4,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Component;
 import ua.maks.prog.entity.Order;
 import ua.maks.prog.repository.OrderRepository;
-import ua.maks.prog.views.OrderStatus;
+import ua.maks.prog.enums.OrderStatus;
 
 import java.util.List;
 import java.util.UUID;

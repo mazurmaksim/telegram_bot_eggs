@@ -5,7 +5,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.GenericGenerator;
-import ua.maks.prog.views.OrderStatus;
+import ua.maks.prog.enums.OrderStatus;
 
 import java.util.UUID;
 

@@ -174,7 +174,6 @@ public class ChatBot extends TelegramLongPollingBot {
 
         if (isAdmin) {
             sendAdminMainMenu(chatId);
-            sendMessage(chatId, messages.getAdmin().getMenu().getAdminCongrats());
         } else {
             sendMessage(chatId, messages.getAdmin().getMenu().getUnknownCommand());
         }
@@ -486,7 +485,18 @@ public class ChatBot extends TelegramLongPollingBot {
                 messages.getAdmin().getMenu().getYesterday(), () -> sendDayAmount(chatId, LocalDate.now().minusDays(1), formatDayStatistic(messages.getAdmin().getMenu().getYesterday().toLowerCase())),
                 messages.getAdmin().getMenu().getMonths(), () -> sendMessage(chatId, formatMonthStatistic(counterService.calculateAmountByMonth(allStatistic))),
                 messages.getAdmin().getMenu().getAddedToSale(), () -> sendMessage(chatId, formatWeekStatistic(counterService.calculateAmountByWeek(allStatistic))),
-                messages.getCommon().getToSale(), () -> sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now()))),
+                messages.getCommon().getToSale(), () -> {
+                    sendMessage(chatId, formatSalesStatistic(salesService.getAmoutToSale(LocalDate.now())));
+                    sendSaleSubMenu(chatId);
+                },
+                messages.getAdmin().getMenu().getAddToSale(), () -> {
+                    sendMessage(chatId, messages.getAdmin().getMenu().getAmountToSale());
+                    adminStates.put(chatId, AdminAction.WAITING_FOR_STOCK_INPUT);
+                },
+                messages.getAdmin().getMenu().getOrder(), () -> {
+                    sendMessage(chatId, messages.getAdmin().getMenu().getOrder());
+                    sendOrderListInline(chatId);
+                },
                 messages.getAdmin().getMenu().getAddEggs(), () -> {
                     sendMessage(chatId, messages.getAdmin().getMenu().getEnterAmountOfEggs());
                     adminStates.put(chatId, AdminAction.WAITING_FOR_NEW_EGGS);

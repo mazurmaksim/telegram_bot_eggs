@@ -18,13 +18,13 @@ public class BotInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        LOGGER.info("✅ Bot init started");
+        LOGGER.info("Bot init started");
         try {
             TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
             botsApi.registerBot(chatBot);
-            LOGGER.info("✅ Bot successfully registered");
+            LOGGER.info("Bot successfully registered");
         } catch (Exception e) {
-            LOGGER.error("❌ Bot registration failed: {}", e.getMessage(), e);
+            LOGGER.error("Bot registration failed: {}", e.getMessage(), e);
         }
     }
 }

@@ -39,13 +39,13 @@ public class WeatherService {
 
             if (apiKey != null && city != null) {
                 String url = String.format(BASE_URL, city, apiKey);
-                LOGGER.debug("🌍 Requesting weather for city: {}", city);
+                LOGGER.debug("Requesting weather for city: {}", city);
                 return restTemplate.getForObject(url, String.class);
             } else {
-                LOGGER.warn("⚠️ Weather settings are missing (apiKey or city is null)");
+                LOGGER.warn("Weather settings are missing (apiKey or city is null)");
             }
         } catch (Exception e) {
-            LOGGER.error("❌ Error while fetching weather: {}", e.getMessage(), e);
+            LOGGER.error("Error while fetching weather: {}", e.getMessage(), e);
         }
         return null;
     }

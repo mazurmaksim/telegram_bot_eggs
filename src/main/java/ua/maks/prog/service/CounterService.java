@@ -30,25 +30,25 @@ public class CounterService {
     public void saveCounter(Counter counter) {
         if (counter != null) {
             counterRepository.save(counter);
-            LOGGER.info("🥚 Counter saved: date={}, amount={}", counter.getDateTime(), counter.getAmount());
+            LOGGER.info("Counter saved: date={}, amount={}", counter.getDateTime(), counter.getAmount());
         } else {
-            LOGGER.warn("⚠️ Tried to save null counter");
+            LOGGER.warn("Tried to save null counter");
         }
     }
 
     public Optional<Counter> getCounterByDate(LocalDate date) {
         Optional<Counter> counter = counterRepository.findCounterByDate(date);
         if (counter.isPresent()) {
-            LOGGER.debug("📅 Found counter for date {}: amount={}", date, counter.get().getAmount());
+            LOGGER.debug("Found counter for date {}: amount={}", date, counter.get().getAmount());
         } else {
-            LOGGER.debug("📅 No counter found for date {}", date);
+            LOGGER.debug("No counter found for date {}", date);
         }
         return counter;
     }
 
     public List<Counter> getAllStatistic() {
         List<Counter> stats = counterRepository.findAllCounters();
-        LOGGER.debug("📊 Retrieved full statistics, {} entries", stats.size());
+        LOGGER.debug("Retrieved full statistics, {} entries", stats.size());
         return stats;
     }
 
@@ -61,7 +61,7 @@ public class CounterService {
                 amountByDay.put(day, amountByDay.getOrDefault(day, 0) + counter.getAmount());
             }
         }
-        LOGGER.debug("📈 Weekly chart data calculated: {} days", amountByDay.size());
+        LOGGER.debug("Weekly chart data calculated: {} days", amountByDay.size());
         return amountByDay;
     }
 
@@ -73,7 +73,7 @@ public class CounterService {
                 amountByMonth.put(month, amountByMonth.getOrDefault(month, 0) + counter.getAmount());
             }
         }
-        LOGGER.debug("📆 Monthly chart data calculated: {} months", amountByMonth.size());
+        LOGGER.debug("Monthly chart data calculated: {} months", amountByMonth.size());
         return new TreeMap<>(amountByMonth);
     }
 }

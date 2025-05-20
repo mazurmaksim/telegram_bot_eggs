@@ -23,18 +23,18 @@ public class SalesService {
     public void saveAmountToSale(Sales sales) {
         if (sales != null) {
             salesRepository.save(sales);
-            logger.info("💰 Saved sales record: date={}, amount={}", sales.getDateToThisAmount(), sales.getAmountToSale());
+            logger.info("Saved sales record: date={}, amount={}", sales.getDateToThisAmount(), sales.getAmountToSale());
         } else {
-            logger.warn("⚠️ Tried to save null sales object");
+            logger.warn("Tried to save null sales object");
         }
     }
 
     public Sales getAmoutToSale(LocalDate date) {
         Sales sales = salesRepository.findAmountToSale(date);
         if (sales != null) {
-            logger.debug("📊 Found sales record for date {}: amount={}", date, sales.getAmountToSale());
+            logger.debug("Found sales record for date {}: amount={}", date, sales.getAmountToSale());
         } else {
-            logger.debug("📊 No sales record found for date {}", date);
+            logger.debug("No sales record found for date {}", date);
         }
         return sales;
     }

@@ -13,7 +13,7 @@ public class WeatherParser {
             ObjectMapper objectMapper = new ObjectMapper();
             return objectMapper.readValue(json, WeatherResponse.class);
         } catch (Exception e) {
-            LOGGER.error("🌩️ Failed to parse weather JSON: {}", e.getMessage(), e);
+            LOGGER.error("Failed to parse weather JSON: {}", e.getMessage(), e);
             return null;
         }
     }

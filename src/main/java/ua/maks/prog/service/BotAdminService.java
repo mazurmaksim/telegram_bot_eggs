@@ -20,7 +20,7 @@ public class BotAdminService {
 
     public List<BotAdmin> getBotAdmins() {
         List<BotAdmin> admins = botAdminRepository.getAdmins();
-        logger.debug("🛡️ Retrieved {} bot admins", admins.size());
+        logger.debug("Retrieved {} bot admins", admins.size());
         return admins;
     }
 }

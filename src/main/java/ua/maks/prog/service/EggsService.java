@@ -45,10 +45,10 @@ public class EggsService {
                     weatherForecast.setTemperature(weatherResponse.getMain().getTemp());
                     weatherForecast.setWindSpeed(weatherResponse.getWind().getSpeed());
                     weatherForecast.setRetrievedSuccessfully(true);
-                    LOGGER.debug("🌤️ Weather fetched for {}: {}°C, {}% humidity, {} m/s wind",
+                    LOGGER.debug("Weather fetched for {}: {}°C, {}% humidity, {} m/s wind",
                             date, weatherForecast.getTemperature(), weatherForecast.getHumidity(), weatherForecast.getWindSpeed());
                 } else {
-                    LOGGER.warn("⚠️ Weather data not available for {}", date);
+                    LOGGER.warn("Weather data not available for {}", date);
                 }
 
                 String foodCompositionName = feedCompositionService.findActiveCompositionName();
@@ -62,18 +62,18 @@ public class EggsService {
                 weatherForecast.setDayStatistic(entry);
 
                 counterService.saveCounter(entry);
-                LOGGER.info("🥚 New egg entry saved: date={}, amount={}", date, amount);
+                LOGGER.info("New egg entry saved: date={}, amount={}", date, amount);
             } else {
                 Integer updatedAmount = counter.get().getAmount() + amount;
                 counter.get().setAmount(updatedAmount);
                 counterService.saveCounter(counter.get());
-                LOGGER.warn("✏️ Entry for {} already existed — amount updated to {}", date, updatedAmount);
+                LOGGER.warn("Entry for {} already existed — amount updated to {}", date, updatedAmount);
             }
 
         } catch (NumberFormatException e) {
-            LOGGER.error("❌ Invalid input for egg amount: '{}'", amountInput);
+            LOGGER.error("Invalid input for egg amount: '{}'", amountInput);
         } catch (Exception e) {
-            LOGGER.error("💥 Unexpected error in addEgg(): {}", e.getMessage(), e);
+            LOGGER.error("Unexpected error in addEgg(): {}", e.getMessage(), e);
         }
     }
 
@@ -82,7 +82,7 @@ public class EggsService {
             WeatherParser parser = new WeatherParser();
             return parser.parseWeatherJson(weatherService.getWeather());
         } catch (Exception ex) {
-            LOGGER.error("🌩️ Failed to parse weather JSON: {}", ex.getMessage(), ex);
+            LOGGER.error("Failed to parse weather JSON: {}", ex.getMessage(), ex);
             return null;
         }
     }

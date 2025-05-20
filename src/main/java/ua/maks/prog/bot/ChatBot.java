@@ -69,7 +69,7 @@ public class ChatBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         try {
             if (update.hasCallbackQuery()) {
-                LOGGER.info("📩 Update received: userId={}, chatId={}, text={}",
+                LOGGER.info("Update received: userId={}, chatId={}, text={}",
                         update.getMessage().getFrom().getId(),
                         update.getMessage().getChatId(),
                         update.getMessage().getText());
@@ -108,7 +108,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 }
             }
         } catch (Exception e) {
-            LOGGER.error("💥 Error processing update from chatId={}: {}", update.getMessage().getChatId(), e.getMessage(), e);
+            LOGGER.error("Error processing update from chatId={}: {}", update.getMessage().getChatId(), e.getMessage(), e);
             sendMessage(update.getMessage().getChatId(),
                     messages.getAdmin().getMenu().getDataNotSaved() + e.getMessage());
         }
@@ -148,7 +148,7 @@ public class ChatBot extends TelegramLongPollingBot {
     private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate, boolean isAdmin) {
         Map<String, Runnable> commands = getStringRunnableMap(chatId);
         AdminAction state = adminStates.getOrDefault(chatId, AdminAction.NONE);
-        LOGGER.debug("👮 Admin command: chatId={}, state={}, text={}", chatId, state, messageText);
+        LOGGER.debug("Admin command: chatId={}, state={}, text={}", chatId, state, messageText);
 
         if (state == AdminAction.WAITING_FOR_NEW_EGGS || state == AdminAction.WAITING_FOR_STOCK_INPUT) {
             try {
@@ -167,7 +167,7 @@ public class ChatBot extends TelegramLongPollingBot {
                     salesService.saveAmountToSale(sales);
                     sendMessage(chatId, messages.getAdmin().getMenu().getAddedToSale() + quantity + messages.getCommon().getEggs());
                 }
-                LOGGER.debug("🔁 Admin state updated: chatId={}, newState={}", chatId, AdminAction.NONE);
+                LOGGER.debug("Admin state updated: chatId={}, newState={}", chatId, AdminAction.NONE);
                 adminStates.put(chatId, AdminAction.NONE);
                 sendAdminMainMenu(chatId);
             } catch (NumberFormatException e) {
@@ -251,7 +251,7 @@ public class ChatBot extends TelegramLongPollingBot {
         sendMessage(order.getChatId(), userMsg);
 
         sendOrderListInline(adminChatId);
-        LOGGER.info("✅ Order completed: id={}, byAdmin={}", order.getId(), adminChatId);
+        LOGGER.info("Order completed: id={}, byAdmin={}", order.getId(), adminChatId);
     }
 
     private void sendAdminMainMenu(Long chatId) {

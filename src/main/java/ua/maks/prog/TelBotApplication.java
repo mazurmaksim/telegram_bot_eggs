@@ -12,12 +12,12 @@ public class TelBotApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(TelBotApplication.class, args);
-        LOGGER.info("🚀 TelBotApplication started successfully");
+        LOGGER.info("TelBotApplication started successfully");
 
         try {
             Thread.currentThread().join(); // Keeps the bot alive
         } catch (InterruptedException e) {
-            LOGGER.error("🛑 Application interrupted: {}", e.getMessage(), e);
+            LOGGER.error("Application interrupted: {}", e.getMessage(), e);
             Thread.currentThread().interrupt(); // good practice
         }
     }

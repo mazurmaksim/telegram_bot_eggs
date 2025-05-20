@@ -25,7 +25,7 @@ spring:
       hibernate:
         connection:
           pool_size: 1
-    show-sql: true
+    show-sql: false
 
   config:
     import: classpath:messages.yml

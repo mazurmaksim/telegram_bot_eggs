@@ -1,5 +1,7 @@
 package ua.maks.prog.weather.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import ua.maks.prog.entity.Settings;
@@ -9,13 +11,13 @@ import java.util.List;
 
 @Service
 public class WeatherService {
-    private static final String BASE_URL = "https://api.openweathermap.org/data/2.5/weather?q=%s&units=metric&appid=%s";
-    private static String apiKey;
-    private static String city;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(WeatherService.class);
+    private static final String BASE_URL =
+            "https://api.openweathermap.org/data/2.5/weather?q=%s&units=metric&appid=%s";
 
     private final SettingsService settingsService;
     private final RestTemplate restTemplate;
-
 
     public WeatherService(SettingsService settingsService, RestTemplate restTemplate) {
         this.settingsService = settingsService;
@@ -37,10 +39,13 @@ public class WeatherService {
 
             if (apiKey != null && city != null) {
                 String url = String.format(BASE_URL, city, apiKey);
+                LOGGER.debug("🌍 Requesting weather for city: {}", city);
                 return restTemplate.getForObject(url, String.class);
+            } else {
+                LOGGER.warn("⚠️ Weather settings are missing (apiKey or city is null)");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.error("❌ Error while fetching weather: {}", e.getMessage(), e);
         }
         return null;
     }

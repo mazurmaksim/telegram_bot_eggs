@@ -2,6 +2,8 @@ package ua.maks.prog.bot;
 
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.Phonenumber;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -17,17 +19,18 @@ import ua.maks.prog.config.BotMessages;
 import ua.maks.prog.entity.Counter;
 import ua.maks.prog.entity.Order;
 import ua.maks.prog.entity.Sales;
-import ua.maks.prog.model.UserData;
-import ua.maks.prog.service.*;
 import ua.maks.prog.enums.AdminAction;
 import ua.maks.prog.enums.MonthView;
 import ua.maks.prog.enums.OrderStatus;
+import ua.maks.prog.model.UserData;
+import ua.maks.prog.service.*;
 
 import java.time.*;
 import java.util.*;
 
 @Component
 public class ChatBot extends TelegramLongPollingBot {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChatBot.class);
 
     private final BotConfig botConfig;
     private final EggsService eggsService;
@@ -66,6 +69,11 @@ public class ChatBot extends TelegramLongPollingBot {
     public void onUpdateReceived(Update update) {
         try {
             if (update.hasCallbackQuery()) {
+                LOGGER.info("📩 Update received: userId={}, chatId={}, text={}",
+                        update.getMessage().getFrom().getId(),
+                        update.getMessage().getChatId(),
+                        update.getMessage().getText());
+
                 String data = update.getCallbackQuery().getData();
                 Long adminChatId = update.getCallbackQuery().getMessage().getChatId();
                 if (data.startsWith("complete_order:")) {
@@ -100,6 +108,7 @@ public class ChatBot extends TelegramLongPollingBot {
                 }
             }
         } catch (Exception e) {
+            LOGGER.error("💥 Error processing update from chatId={}: {}", update.getMessage().getChatId(), e.getMessage(), e);
             sendMessage(update.getMessage().getChatId(),
                     messages.getAdmin().getMenu().getDataNotSaved() + e.getMessage());
         }
@@ -131,7 +140,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Error creating admin button panel for chatId {}",chatId, e);
         }
     }
 
@@ -139,6 +148,7 @@ public class ChatBot extends TelegramLongPollingBot {
     private void handleAdminCommand(Long chatId, String messageText, LocalDateTime savingLocalDate, boolean isAdmin) {
         Map<String, Runnable> commands = getStringRunnableMap(chatId);
         AdminAction state = adminStates.getOrDefault(chatId, AdminAction.NONE);
+        LOGGER.debug("👮 Admin command: chatId={}, state={}, text={}", chatId, state, messageText);
 
         if (state == AdminAction.WAITING_FOR_NEW_EGGS || state == AdminAction.WAITING_FOR_STOCK_INPUT) {
             try {
@@ -157,7 +167,7 @@ public class ChatBot extends TelegramLongPollingBot {
                     salesService.saveAmountToSale(sales);
                     sendMessage(chatId, messages.getAdmin().getMenu().getAddedToSale() + quantity + messages.getCommon().getEggs());
                 }
-
+                LOGGER.debug("🔁 Admin state updated: chatId={}, newState={}", chatId, AdminAction.NONE);
                 adminStates.put(chatId, AdminAction.NONE);
                 sendAdminMainMenu(chatId);
             } catch (NumberFormatException e) {
@@ -213,7 +223,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Can not create orders for approve for chatId {}",chatId, e);
         }
     }
 
@@ -241,6 +251,7 @@ public class ChatBot extends TelegramLongPollingBot {
         sendMessage(order.getChatId(), userMsg);
 
         sendOrderListInline(adminChatId);
+        LOGGER.info("✅ Order completed: id={}, byAdmin={}", order.getId(), adminChatId);
     }
 
     private void sendAdminMainMenu(Long chatId) {
@@ -274,7 +285,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(sendMessage);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Error creating admin panel for chatId {}",chatId, e);
         }
     }
 
@@ -414,7 +425,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Can not create user menu for chatId {}", chatId, e);
         }
     }
 
@@ -425,7 +436,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(msg);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Get user phone error for chatId {}", chatId, e);
         }
     }
 
@@ -435,7 +446,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(msg);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Telegram confirmation error for chatId {}", chatId, e);
         }
     }
 
@@ -457,7 +468,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(msg);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Can not create amount panel {}", chatId, e);
         }
     }
 
@@ -473,7 +484,7 @@ public class ChatBot extends TelegramLongPollingBot {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            e.printStackTrace();
+            LOGGER.error("Can not send message for chatId {}", chatId, e);
         }
     }
 

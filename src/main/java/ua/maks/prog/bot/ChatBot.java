@@ -520,18 +520,23 @@ public class ChatBot extends TelegramLongPollingBot {
 
     private String formatMonthStatistic(Map<Month, Integer> monthStatistic) {
         StringBuilder monthBuilder = new StringBuilder(messages.getAdmin().getMenu().getStatByMonths());
+        monthBuilder.append("\n```").append(System.lineSeparator());
+
         monthStatistic.forEach((month, amount) -> {
             if (amount != 0) {
-                monthBuilder.append("📅 ")
-                        .append(MonthView.valueOf(month.name()).getMonthName())
-                        .append(": ")
-                        .append(amount)
-                        .append(" 🥚\n")
-                        .append(System.lineSeparator())
-                        .append(messages.getAdmin().getMenu().getAverageMonthsAmount())
-                        .append(amount/month.length(true));
+                String monthName = MonthView.valueOf(month.name()).getMonthName();
+                int avg = amount / month.length(true);
+
+                monthBuilder.append(String.format("📅 %-10s : %4d 🥚  %s %3d%n",
+                        monthName,
+                        amount,
+                        messages.getAdmin().getMenu().getAverageMonthsAmount(),
+                        avg
+                ));
             }
         });
+
+        monthBuilder.append("```");
         return monthBuilder.toString();
     }
 

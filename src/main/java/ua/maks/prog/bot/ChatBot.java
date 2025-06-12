@@ -520,8 +520,6 @@ public class ChatBot extends TelegramLongPollingBot {
 
     private String formatMonthStatistic(Map<Month, Integer> monthStatistic) {
         StringBuilder monthBuilder = new StringBuilder(messages.getAdmin().getMenu().getStatByMonths());
-        monthBuilder.append("\n```").append(System.lineSeparator());
-
         monthStatistic.forEach((month, amount) -> {
             if (amount != 0) {
                 String monthName = MonthView.valueOf(month.name()).getMonthName();
@@ -535,8 +533,6 @@ public class ChatBot extends TelegramLongPollingBot {
                 ));
             }
         });
-
-        monthBuilder.append("```");
         return monthBuilder.toString();
     }
 

@@ -207,6 +207,15 @@ public class BotMessages {
             private String inputCorrectNum;
             private String unknownCommand;
             private String adminCongrats;
+            private String averageMonthsAmount;
+
+            public String getAverageMonthsAmount() {
+                return averageMonthsAmount;
+            }
+
+            public void setAverageMonthsAmount(String averageMonthsAmount) {
+                this.averageMonthsAmount = averageMonthsAmount;
+            }
 
             public String getAdminCongrats() {
                 return adminCongrats;

@@ -526,7 +526,10 @@ public class ChatBot extends TelegramLongPollingBot {
                         .append(MonthView.valueOf(month.name()).getMonthName())
                         .append(": ")
                         .append(amount)
-                        .append(" 🥚\n");
+                        .append(" 🥚\n")
+                        .append(System.lineSeparator())
+                        .append(messages.getAdmin().getMenu().getAverageMonthsAmount())
+                        .append(amount/month.length(true));
             }
         });
         return monthBuilder.toString();

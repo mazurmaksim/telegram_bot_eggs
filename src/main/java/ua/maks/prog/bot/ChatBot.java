@@ -523,13 +523,13 @@ public class ChatBot extends TelegramLongPollingBot {
         monthStatistic.forEach((month, amount) -> {
             if (amount != 0) {
                 String monthName = MonthView.valueOf(month.name()).getMonthName();
-                int avg = amount / month.length(true);
+                double avg = (double) amount / month.length(true);
 
-                monthBuilder.append(String.format("📅 %-10s : %4d 🥚  %s %3d%n",
-                        monthName,
-                        amount,
-                        messages.getAdmin().getMenu().getAverageMonthsAmount(),
-                        avg
+                monthBuilder.append(String.format("📅 %-10s: %4d🥚  %s %.1f%n",
+                                monthName,
+                                amount,
+                                messages.getAdmin().getMenu().getAverageMonthsAmount(),
+                                avg
                 ));
             }
         });
